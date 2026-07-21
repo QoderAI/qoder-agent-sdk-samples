@@ -1,0 +1,16 @@
+{
+  "name": "qoder-agent-sdk-samples-typescript",
+  "private": true,
+  "workspaces": [
+    "quickstart",
+    "multi-turn-conversation",
+    "streaming-chat",
+    "code-review",
+    "tool-permissions",
+    "ask-user-question",
+    "model-selection",
+    "hooks",
+    "custom-tools",
+    "subagents"
+  ]
+}

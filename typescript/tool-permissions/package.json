@@ -1,0 +1,17 @@
+{
+  "name": "@qoder-samples/typescript-tool-permissions",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "tsx index.ts",
+    "check": "tsc --noEmit --target ES2022 --module NodeNext --moduleResolution NodeNext --types node index.ts"
+  },
+  "dependencies": {
+    "@qoder-ai/qoder-agent-sdk": "^1.0.15"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0"
+  }
+}

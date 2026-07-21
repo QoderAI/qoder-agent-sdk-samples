@@ -1,0 +1,67 @@
+name: Sample bug report
+description: Report a sample that fails to run, is unclear, or drifts from current SDK behavior.
+title: "[bug] <sample>: <short summary>"
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. This tracker is for the **samples** in this
+        repository. For questions about the SDK itself, see the
+        [Qoder Agent SDK documentation](https://docs.qoder.com/en/cli/sdk).
+  - type: input
+    id: sample
+    attributes:
+      label: Sample
+      description: Which sample is affected?
+      placeholder: quickstart
+    validations:
+      required: true
+  - type: dropdown
+    id: language
+    attributes:
+      label: Language
+      options:
+        - TypeScript
+        - Python
+        - Both
+    validations:
+      required: true
+  - type: input
+    id: sdk-version
+    attributes:
+      label: SDK version
+      description: The installed SDK version.
+      placeholder: "TypeScript 1.0.15 / Python 1.0.9"
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: Command run
+      description: The exact command you ran.
+      render: bash
+      placeholder: npm start -- /path/to/repository
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior and output
+      description: What happened, including any error output. Do not include credentials or tokens.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, and Node.js or Python version.
+      placeholder: "macOS 14, Node.js 20.11 / Python 3.12"
+    validations:
+      required: false

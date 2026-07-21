@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Qoder Agent SDK documentation
+    url: https://docs.qoder.com/en/cli/sdk
+    about: Questions about the SDK itself (not these samples) are answered in the SDK docs.
+  - name: Qoder CLI
+    url: https://qoder.com/cli
+    about: Product information and downloads for the Qoder CLI.

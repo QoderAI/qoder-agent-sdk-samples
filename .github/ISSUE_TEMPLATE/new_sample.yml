@@ -1,0 +1,49 @@
+name: New sample proposal
+description: Propose a new sample before writing code, so the concept and scope are agreed first.
+title: "[sample] <proposed name>"
+labels: ["new-sample"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        New samples are welcome. Please propose the idea here first so we can
+        agree on scope. See `CONTRIBUTING.md` for the sample requirements and the
+        steps to add one.
+  - type: input
+    id: name
+    attributes:
+      label: Proposed sample name
+      description: Kebab-case, matching the directory name.
+      placeholder: streaming-tool-use
+    validations:
+      required: true
+  - type: textarea
+    id: concept
+    attributes:
+      label: SDK concept demonstrated
+      description: The single primary SDK concept this sample teaches.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why it's useful
+      description: What a reader learns and why it isn't already covered by an existing sample.
+    validations:
+      required: true
+  - type: textarea
+    id: outline
+    attributes:
+      label: Outline
+      description: The prompt or flow, the tools/permissions used, and any inputs the sample needs.
+    validations:
+      required: false
+  - type: checkboxes
+    id: parity
+    attributes:
+      label: Requirements
+      options:
+        - label: I plan to provide both TypeScript and Python versions with equivalent behavior.
+          required: true
+        - label: The sample uses only public SDK exports and the smallest practical tool set.
+          required: true
