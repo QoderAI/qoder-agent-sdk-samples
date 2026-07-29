@@ -17,10 +17,12 @@ TypeScript 和 Python 实现。
 | Hooks | 添加生命周期观测、上下文注入和工具策略 | [查看](typescript/hooks) | [查看](python/hooks) |
 | Custom tools | 将应用函数注册为进程内 MCP 工具 | [查看](typescript/custom-tools) | [查看](python/custom-tools) |
 | Subagents | 将任务委派给 SDK 定义的专业子 Agent | [查看](typescript/subagents) | [查看](python/subagents) |
+| External session storage | 通过 Redis 或 PostgreSQL 在另一个运行实例上恢复会话 | [查看](typescript/external-session-storage) | [查看](python/external-session-storage) |
 
 ## 准备工作
 
-这些示例从环境变量读取 Personal Access Token。认证配置和其他可用认证方式见
+除非示例 README 另有说明，否则示例从环境变量读取 Personal Access Token。认证
+配置和其他可用认证方式见
 [SDK 认证文档](https://docs.qoder.com/en/cli/sdk/authentication)。
 
 ```bash
@@ -36,10 +38,10 @@ TypeScript 需要 Node.js 18 或更高版本，Python 需要 Python 3.10 或更�
 
 各示例的依赖清单声明了兼容的 SDK 版本范围，仓库锁文件则记录了 CI 使用的确切版本。
 
-最近一次验证时间：2026 年 7 月 20 日：
+最近一次验证时间：2026 年 7 月 29 日：
 
-- TypeScript SDK 1.0.15
-- Python SDK 1.0.9
+- TypeScript SDK 1.0.16
+- Python SDK 1.0.10
 
 ## 许可与条款
 

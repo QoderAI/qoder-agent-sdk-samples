@@ -17,11 +17,13 @@ Every sample is available in TypeScript and Python.
 | Hooks | Add lifecycle observation, context injection, and tool policy | [Open](typescript/hooks) | [Open](python/hooks) |
 | Custom tools | Expose application functions as in-process MCP tools | [Open](typescript/custom-tools) | [Open](python/custom-tools) |
 | Subagents | Delegate a task to specialized SDK-defined agents | [Open](typescript/subagents) | [Open](python/subagents) |
+| External session storage | Resume a session on another runtime through Redis or PostgreSQL | [Open](typescript/external-session-storage) | [Open](python/external-session-storage) |
 
 ## Setup
 
-These samples read a Personal Access Token from the environment. See
-[SDK Authentication](https://docs.qoder.com/en/cli/sdk/authentication) for the
+Unless a sample README says otherwise, samples read a Personal Access Token
+from the environment. See
+[SDK Authentication](https://docs.qoder.com/en/cli/sdk/authentication) for
 setup and other supported authentication methods.
 
 ```bash
@@ -45,10 +47,10 @@ commands.
 The sample manifests declare compatible SDK version ranges, while the
 repository lockfiles record the exact versions used by CI.
 
-Last verified on July 20, 2026:
+Last verified on July 29, 2026:
 
-- TypeScript SDK 1.0.15
-- Python SDK 1.0.9
+- TypeScript SDK 1.0.16
+- Python SDK 1.0.10
 
 ## License and terms
 

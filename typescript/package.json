@@ -11,6 +11,7 @@
     "model-selection",
     "hooks",
     "custom-tools",
-    "subagents"
+    "subagents",
+    "external-session-storage"
   ]
 }

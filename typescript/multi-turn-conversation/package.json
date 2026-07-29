@@ -7,7 +7,7 @@
     "check": "tsc --noEmit --target ES2022 --module NodeNext --moduleResolution NodeNext --types node index.ts"
   },
   "dependencies": {
-    "@qoder-ai/qoder-agent-sdk": "^1.0.15"
+    "@qoder-ai/qoder-agent-sdk": "^1.0.16"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
