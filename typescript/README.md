@@ -7,5 +7,5 @@ once, run:
 npm install
 ```
 
-You can then run a sample from its directory with `npm start`. Complete the
-repository-level setup before running a sample.
+Run a sample with the script documented in its README; most use `npm start`.
+Complete the repository-level setup before running a sample.

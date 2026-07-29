@@ -39,7 +39,7 @@ jobs:
         working-directory: python
       - name: Type-check samples
         run: |
-          for sample in quickstart multi-turn-conversation streaming-chat code-review tool-permissions ask-user-question model-selection hooks custom-tools subagents; do
-            uv run mypy "$sample/main.py"
+          for sample in quickstart multi-turn-conversation streaming-chat code-review tool-permissions ask-user-question model-selection hooks custom-tools subagents external-session-storage; do
+            uv run mypy "$sample"
           done
         working-directory: python

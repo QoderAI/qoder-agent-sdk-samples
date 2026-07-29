@@ -46,11 +46,12 @@ Use an existing sample (for example, `quickstart`) as a template, then register
 the new sample everywhere it needs to appear. Replace `<sample>` with your
 kebab-case sample name.
 
-1. **Create the TypeScript sample** at `typescript/<sample>/` with `index.ts`,
-   `README.md`, and `package.json`. Copy `package.json` from an existing sample
-   and update the `name` field to `@qoder-samples/typescript-<sample>`.
-2. **Create the Python sample** at `python/<sample>/` with `main.py`,
-   `README.md`, and `requirements.txt`.
+1. **Create the TypeScript sample** at `typescript/<sample>/` with one or more
+   runnable `.ts` entry files, `README.md`, and `package.json`. Copy
+   `package.json` from an existing sample and update the `name` field to
+   `@qoder-samples/typescript-<sample>`.
+2. **Create the Python sample** at `python/<sample>/` with one or more runnable
+   `.py` entry files, `README.md`, and `requirements.txt`.
 3. **Register the TypeScript workspace:** add `<sample>` to the `workspaces`
    array in `typescript/package.json`.
 4. **Register the Python type check:** add `<sample>` to the `for sample in ...`
@@ -59,7 +60,8 @@ kebab-case sample name.
    in `README.zh-CN.md`.
 
 Keep the TypeScript and Python versions behaviorally equivalent so readers can
-switch between languages.
+switch between languages. When one concept has multiple independently copyable
+variants, keep them in one sample directory and list every entry in its README.
 
 ## Running the checks
 
@@ -69,8 +71,8 @@ request:
 ```bash
 cd typescript && npm ci && npm run check --workspaces
 cd ../python && uv sync && uv run ruff check . && uv run ruff format --check .
-for sample in quickstart multi-turn-conversation streaming-chat code-review tool-permissions ask-user-question model-selection hooks custom-tools subagents; do
-  uv run mypy "$sample/main.py"
+for sample in quickstart multi-turn-conversation streaming-chat code-review tool-permissions ask-user-question model-selection hooks custom-tools subagents external-session-storage; do
+  uv run mypy "$sample"
 done
 ```
 
