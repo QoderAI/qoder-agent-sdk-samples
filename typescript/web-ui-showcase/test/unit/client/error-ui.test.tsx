@@ -516,7 +516,6 @@ describe("page recovery", () => {
       .mockResolvedValueOnce({ commandId });
     const api = {
       pickWorkspace: vi.fn(accepted),
-      registerWorkspace: vi.fn(accepted),
       startSession: vi.fn(async () => ({ sessionId, workspaceId })),
       ensureSession,
       renameSession: vi.fn(accepted),

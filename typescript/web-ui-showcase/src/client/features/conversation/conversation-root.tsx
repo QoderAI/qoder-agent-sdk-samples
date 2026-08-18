@@ -41,7 +41,12 @@ export function ConversationRoot(props: {
   }, [drafts, state.sessionIds]);
   const sessionId = state.selectedSessionId;
   const session = sessionId === null ? undefined : state.sessions[sessionId];
-  const workspace = [...props.workspaces].sort(
+  const pinnedHomeWorkspace = state.homeWorkspaceId === null
+    ? undefined
+    : props.workspaces.find(
+        (candidate) => candidate.id === state.homeWorkspaceId,
+      );
+  const workspace = pinnedHomeWorkspace ?? [...props.workspaces].sort(
     (left, right) =>
       new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime(),
   )[0];

@@ -69,7 +69,6 @@ function setupShell(options: {
   const accepted = async () => ({ commandId: crypto.randomUUID() });
   const api = {
     pickWorkspace: vi.fn(accepted),
-    registerWorkspace: vi.fn(accepted),
     startSession: vi.fn(async () => ({ sessionId, workspaceId })),
     ensureSession: vi.fn(accepted),
     renameSession: vi.fn(accepted),

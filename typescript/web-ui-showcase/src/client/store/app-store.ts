@@ -120,6 +120,10 @@ export class AppStore {
     this.#replace({ ...this.#state, settingsOpen: true });
   }
 
+  setHomeWorkspace(workspaceId: string): void {
+    this.#replace({ ...this.#state, homeWorkspaceId: workspaceId });
+  }
+
   closeSettings(): void {
     this.#replace({ ...this.#state, settingsOpen: false });
   }

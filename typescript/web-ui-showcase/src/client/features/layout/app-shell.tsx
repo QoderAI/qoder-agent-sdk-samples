@@ -22,7 +22,6 @@ import { SettingsDialog, type SettingsApi } from "../runtime/settings-dialog.js"
 
 export type ShellApi = SessionActionApi & ConversationApi & SettingsApi & SdkConsoleApi & {
   pickWorkspace(): Promise<AcceptedCommand>;
-  registerWorkspace(input: { path: string }): Promise<AcceptedCommand>;
   startSession(input: StartSessionCommand): Promise<SessionStarted>;
   ensureSession(sessionId: string): Promise<AcceptedCommand>;
 };
@@ -146,6 +145,10 @@ export function AppShell(props: {
         selectedSessionId={state.selectedSessionId}
         onSelectSession={sessionSelection.selectSession}
         onNewSession={newSession}
+        onNewSessionInWorkspace={(workspaceId) => {
+          store.setHomeWorkspace(workspaceId);
+          newSession();
+        }}
         onOpenSettings={() => store.openSettings()}
         onOpenSdkConsole={() => store.openSdkConsole()}
         onToggle={() => {
@@ -201,13 +204,12 @@ export function AppShell(props: {
         <div className="project-drawer-content">
           <WorkspacePanel
             pickWorkspace={() => props.api.pickWorkspace()}
-            registerWorkspace={(input) => props.api.registerWorkspace(input)}
+            onNewSession={() => {
+              newSession();
+              setProjectDrawer(false);
+            }}
             onAccepted={onAccepted}
           />
-          <button type="button" className="sidebar-new-session" onClick={() => {
-            newSession();
-            setProjectDrawer(false);
-          }}>{copy.session.new}</button>
           <SessionTree
             workspaces={workspaces}
             sessions={sessions}
@@ -216,7 +218,8 @@ export function AppShell(props: {
               sessionSelection.selectSession(sessionId);
               setProjectDrawer(false);
             }}
-            onNewSession={() => {
+            onNewSessionInWorkspace={(workspaceId) => {
+              store.setHomeWorkspace(workspaceId);
               newSession();
               setProjectDrawer(false);
             }}

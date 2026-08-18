@@ -113,7 +113,6 @@ function setup(options: {
   const accepted = async () => ({ commandId: crypto.randomUUID() });
   const api = {
     pickWorkspace: vi.fn(accepted),
-    registerWorkspace: vi.fn(accepted),
     searchWorkspaceFiles: vi.fn(async () => ({
       items: [{
         path: "src/app.ts",
@@ -176,7 +175,7 @@ describe("Workspace and Session shell", () => {
       screen.getByRole("heading", { name: "探索未至之境" }),
     ).toBeVisible();
     expect(screen.getAllByLabelText("消息")).toHaveLength(1);
-    expect(screen.getByText("最近 Workspace：recent-repo")).toBeVisible();
+    expect(screen.getByText("Workspace：recent-repo")).toBeVisible();
 
     await user.type(screen.getByLabelText("消息"), "检查这个项目");
     await user.click(screen.getByRole("button", { name: "发送" }));
@@ -188,6 +187,29 @@ describe("Workspace and Session shell", () => {
     expect(realtime.selectSession).toHaveBeenCalledWith(
       "00000000-0000-4000-8000-000000000c04",
     );
+  });
+
+  it("starts the next Session in the workspace picked from its group heading", async () => {
+    const user = userEvent.setup();
+    const { api } = setup({
+      selectedSession: false,
+      additionalWorkspace: true,
+    });
+
+    expect(screen.getByText("Workspace：recent-repo")).toBeVisible();
+
+    await user.click(
+      screen.getByRole("button", { name: "在 sample-repo 新建 Session" }),
+    );
+    expect(screen.getByText("Workspace：sample-repo")).toBeVisible();
+
+    await user.type(screen.getByLabelText("消息"), "检查这个项目");
+    await user.click(screen.getByRole("button", { name: "发送" }));
+
+    expect(api.startSession).toHaveBeenCalledWith({
+      workspaceId,
+      text: "检查这个项目",
+    });
   });
 
   it("moves Session actions out of the conversation header", async () => {
@@ -773,15 +795,17 @@ describe("Workspace and Session shell", () => {
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 
-  it("supports native folder picking and manual absolute paths", async () => {
+  it("replaces the manual path entry with a fresh Session action in the workspace panel", async () => {
     const user = userEvent.setup();
-    const { api } = setup();
+    const { api, realtime } = setup();
 
     await user.click(screen.getByRole("button", { name: "选择文件夹" }));
     expect(api.pickWorkspace).toHaveBeenCalledOnce();
-    await user.click(screen.getByRole("button", { name: "输入路径" }));
-    await user.type(screen.getByLabelText("项目绝对路径"), "/repo-2");
-    await user.click(screen.getByRole("button", { name: "添加项目" }));
-    expect(api.registerWorkspace).toHaveBeenCalledWith({ path: "/repo-2" });
+    expect(
+      screen.queryByRole("button", { name: "输入路径" }),
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "新建 Session" }));
+    expect(realtime.selectSession).toHaveBeenCalledWith(null);
   });
 });

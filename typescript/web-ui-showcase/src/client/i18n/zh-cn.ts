@@ -14,20 +14,14 @@ export const copy = Object.freeze({
   workspace: {
     navigation: "项目导航",
     controls: "项目操作",
-    add: "添加项目",
     chooseFolder: "选择文件夹",
-    enterPath: "输入路径",
-    dialogTitle: "添加本地项目",
-    absolutePath: "项目绝对路径",
-    addFailed: "无法添加项目",
     requestFailed: "无法提交项目操作，请重试。",
-    accepted: "项目添加请求已接受",
     pickerAccepted: "文件夹选择器已打开",
   },
   home: {
     title: "探索未至之境",
     subtitle: "从一个问题开始，Qoder 会在本地 Workspace 中创建 Session。",
-    recentWorkspace: "最近 Workspace",
+    recentWorkspace: "Workspace",
     noWorkspace: "添加 Workspace 后即可开始",
   },
   session: {

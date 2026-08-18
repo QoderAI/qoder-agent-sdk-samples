@@ -122,6 +122,7 @@ export function createInitialState(): AppState {
     settingsOpen: false,
     sdkConsoleOpen: false,
     sdkConsoleTab: "hooks",
+    homeWorkspaceId: null,
     connectionState: "disconnected",
     protocolError: null,
   };

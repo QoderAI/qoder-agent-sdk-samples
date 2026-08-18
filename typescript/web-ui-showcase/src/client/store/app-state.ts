@@ -35,6 +35,8 @@ export type ProductViewState = {
   settingsOpen: boolean;
   sdkConsoleOpen: boolean;
   sdkConsoleTab: SdkConsoleTab;
+  /** Workspace the home hero should target; null falls back to the most recent one. */
+  homeWorkspaceId: string | null;
 };
 
 export type AppState = ProductViewState & {

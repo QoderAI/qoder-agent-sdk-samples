@@ -45,7 +45,7 @@ export type CommandOwner =
     }
   | {
       surface: "workspace";
-      control: "pick" | "register";
+      control: "pick";
     };
 
 export type CommandOwnership = {

@@ -112,7 +112,6 @@ function setup(options: {
   const accepted = async () => ({ commandId: crypto.randomUUID() });
   const api = {
     pickWorkspace: vi.fn(accepted),
-    registerWorkspace: vi.fn(accepted),
     searchWorkspaceFiles: vi.fn(async () => ({ items: [], truncated: false })),
     startSession: vi.fn(async () => ({ sessionId, workspaceId })),
     ensureSession: vi.fn(accepted),

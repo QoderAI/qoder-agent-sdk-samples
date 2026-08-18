@@ -12,12 +12,12 @@ export function AppSidebar(props: {
   selectedSessionId: string | null;
   onSelectSession: (sessionId: string) => void;
   onNewSession: () => void;
+  onNewSessionInWorkspace: (workspaceId: string) => void;
   onOpenSettings: () => void;
   onOpenSdkConsole: () => void;
   onToggle: () => void;
   api: SessionActionApi & {
     pickWorkspace(): Promise<AcceptedCommand>;
-    registerWorkspace(input: { path: string }): Promise<AcceptedCommand>;
   };
   onAccepted: (label: string, command: AcceptedCommand) => void;
 }): JSX.Element {
@@ -30,13 +30,10 @@ export function AppSidebar(props: {
           {props.collapsed ? "›" : "‹"}
         </button>
       </header>
-      <button className="sidebar-new-session" type="button" aria-label={copy.session.new} onClick={props.onNewSession}>
-        <span aria-hidden="true">＋</span><span className="sidebar-wide">{copy.session.new}</span>
-      </button>
       <div className="sidebar-wide sidebar-browser">
         <WorkspacePanel
           pickWorkspace={() => props.api.pickWorkspace()}
-          registerWorkspace={(input) => props.api.registerWorkspace(input)}
+          onNewSession={props.onNewSession}
           onAccepted={props.onAccepted}
         />
         <SessionTree
@@ -44,7 +41,7 @@ export function AppSidebar(props: {
           sessions={props.sessions}
           selectedSessionId={props.selectedSessionId}
           onSelect={props.onSelectSession}
-          onNewSession={props.onNewSession}
+          onNewSessionInWorkspace={props.onNewSessionInWorkspace}
           api={props.api}
           onAccepted={props.onAccepted}
         />

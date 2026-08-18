@@ -10,7 +10,7 @@ export function SessionTree(props: {
   sessions: SessionView[];
   selectedSessionId: string | null;
   onSelect: (sessionId: string) => void;
-  onNewSession: () => void;
+  onNewSessionInWorkspace: (workspaceId: string) => void;
   api: SessionActionApi;
   onAccepted: (label: string, command: AcceptedCommand) => void;
 }): JSX.Element {
@@ -41,6 +41,18 @@ export function SessionTree(props: {
                 <strong>{workspace.displayName}</strong>
                 <small title={workspace.path}>{workspace.path}</small>
               </div>
+              <button
+                type="button"
+                className="icon-button workspace-new-session"
+                aria-label={`在 ${workspace.displayName} 新建 Session`}
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  props.onNewSessionInWorkspace(workspace.id);
+                }}
+              >
+                +
+              </button>
             </summary>
             <div role="list" aria-label={`${workspace.displayName} 的 Sessions`}>
               {sessions.map((session) => (
