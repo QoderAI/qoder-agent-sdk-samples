@@ -11,7 +11,7 @@ export type CommandOwner =
         | "mcp"
         | "directory"
         | "refresh-account"
-        | "refresh-extensions"
+        | "refresh-capabilities"
         | "plugins";
       sessionId: string;
     }

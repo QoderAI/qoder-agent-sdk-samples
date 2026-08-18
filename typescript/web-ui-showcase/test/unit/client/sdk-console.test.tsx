@@ -55,6 +55,9 @@ function setup(options: { omitVersions?: boolean } = {}) {
         currentPermissionMode: "default",
         capabilities: ["runtime-diagnostic-capability"],
         context: { hiddenProductContext: true },
+        skills: ["review"],
+        agents: [{ name: "general" }],
+        plugins: [{ name: "fixture-plugin" }],
         hooks: [{ event: "PreToolUse", input: "[REDACTED]" }],
         rawEvents: [{ messageType: "system.init", payload: "[REDACTED]" }],
         ...(options.omitVersions === true
@@ -138,16 +141,40 @@ describe("SDK console", () => {
     expect(within(dialog).queryByRole("heading", { name: "Hooks" })).not.toBeInTheDocument();
   });
 
-  it("describes unreported SDK and CLI versions without implying unavailability", async () => {
+  it("hides the Runtime version block until a version is reported", async () => {
     const user = userEvent.setup();
     setup({ omitVersions: true });
 
     await user.click(screen.getByRole("button", { name: "SDK 控制台" }));
 
     const dialog = screen.getByRole("dialog", { name: "SDK 控制台" });
-    expect(within(dialog).getByText("SDK 版本未报告")).toBeVisible();
-    expect(within(dialog).getByText("CLI 版本未报告")).toBeVisible();
-    expect(within(dialog).queryByText(/不可用/u)).not.toBeInTheDocument();
+    expect(within(dialog).queryByLabelText("Runtime 版本")).not.toBeInTheDocument();
+    expect(within(dialog).queryByText(/版本未报告/u)).not.toBeInTheDocument();
+  });
+
+  it("splits Skills, Agents, and Plugins into separate tabs", async () => {
+    const user = userEvent.setup();
+    const { api } = setup();
+
+    await user.click(screen.getByRole("button", { name: "SDK 控制台" }));
+    const dialog = screen.getByRole("dialog", { name: "SDK 控制台" });
+
+    await user.click(within(dialog).getByRole("button", { name: "Skills" }));
+    expect(within(dialog).getByRole("heading", { name: "Skills" })).toBeVisible();
+    expect(within(dialog).getByText("review")).toBeVisible();
+    expect(within(dialog).queryByText("general")).not.toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole("button", { name: "Agents" }));
+    expect(within(dialog).getByRole("heading", { name: "Agents" })).toBeVisible();
+    expect(within(dialog).getByText("general")).toBeVisible();
+
+    await user.click(within(dialog).getByRole("button", { name: "Plugins" }));
+    expect(within(dialog).getByText("fixture-plugin")).toBeVisible();
+    expect(within(dialog).getByRole("button", { name: "重新加载 Plugins" })).toBeVisible();
+    expect(within(dialog).queryByRole("button", { name: "Extensions" })).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(api.refreshRuntime).toHaveBeenCalledWith(sessionId),
+    );
   });
 
   it("moves MCP operations into the SDK console tab", async () => {

@@ -268,24 +268,31 @@ describe("runtime product settings", () => {
     expect(api.sendMessage).not.toHaveBeenCalled();
   });
 
-  it("refreshes Account and Extensions once per SDK console tab", async () => {
+  it("refreshes capability and Account data once per SDK console tab", async () => {
     const user = userEvent.setup();
     const { api } = setup();
 
     await user.click(screen.getByRole("button", { name: "SDK 控制台" }));
     const dialog = screen.getByRole("dialog", { name: "SDK 控制台" });
+
+    await user.click(within(dialog).getByRole("button", { name: "Skills" }));
+    expect(within(dialog).getByText("review")).toBeVisible();
+    expect(api.refreshRuntime).toHaveBeenCalledTimes(1);
+
+    await user.click(within(dialog).getByRole("button", { name: "Agents" }));
+    expect(within(dialog).getByText("general")).toBeVisible();
+    expect(api.refreshRuntime).toHaveBeenCalledTimes(2);
+
+    await user.click(within(dialog).getByRole("button", { name: "Plugins" }));
+    expect(within(dialog).getByText("fixture-plugin")).toBeVisible();
+    await user.click(within(dialog).getByRole("button", { name: "重新加载 Plugins" }));
+    expect(api.reloadPlugins).toHaveBeenCalledWith(sessionId);
+    expect(api.refreshRuntime).toHaveBeenCalledTimes(3);
+
     await user.click(within(dialog).getByRole("button", { name: "Account" }));
     expect(await within(dialog).findByText("developer@example.com")).toBeVisible();
     expect(within(dialog).getByText("Credits")).toBeVisible();
-    expect(api.refreshRuntime).toHaveBeenCalledTimes(1);
-
-    await user.click(within(dialog).getByRole("button", { name: "Extensions" }));
-    expect(within(dialog).getByText("review")).toBeVisible();
-    expect(within(dialog).getByText("general")).toBeVisible();
-    expect(within(dialog).getByText("fixture-plugin")).toBeVisible();
-    expect(api.refreshRuntime).toHaveBeenCalledTimes(2);
-    await user.click(within(dialog).getByRole("button", { name: "重新加载 Plugins" }));
-    expect(api.reloadPlugins).toHaveBeenCalledWith(sessionId);
+    expect(api.refreshRuntime).toHaveBeenCalledTimes(4);
   });
 
   it("adds an allowed directory through the native picker command", async () => {
@@ -305,7 +312,7 @@ describe("runtime product settings", () => {
     await user.click(screen.getByRole("button", { name: "设置" }));
     const dialog = screen.getByRole("dialog", { name: "设置" });
     expect(within(dialog).queryByRole("button", { name: "Account" })).not.toBeInTheDocument();
-    expect(within(dialog).queryByRole("button", { name: "Extensions" })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: "Skills" })).not.toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: "添加目录" })).toBeVisible();
   });
 

@@ -209,7 +209,7 @@ export function SettingsDialog(props: {
                     : { disabledReason: permissionReason })}
                 />
                 <CommandFailureNotice owner={{ surface: "runtime", control: "permission", sessionId: activeSessionId }} />
-                <div>
+                <div className="settings-directory-row">
                   <strong>{copy.runtime.additionalDirectory}</strong>
                   <button
                     className="button ghost"

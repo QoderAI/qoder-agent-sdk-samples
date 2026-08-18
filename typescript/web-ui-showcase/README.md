@@ -2,7 +2,7 @@
 
 This sample is a complete local Web UI application built with the Qoder TypeScript SDK. It is intended as an open-source application template: the product UI stays focused on project work, while the source demonstrates how Session, streaming messages, Approval, MCP, Hooks, Task, Credits, errors, Checkpoint, shutdown, and recovery fit together.
 
-The browser uses a Chinese, light-theme product shell. Established SDK concepts such as Session, Workspace, Model, Permission, MCP, Hooks, Task, Checkpoint, Credits, Skill, Command, and Tool retain their English names. Model and Permission Mode are compact Composer selectors backed by a single-page Settings dialog that also adds allowed directories through the native folder picker, MCP lives in the SDK console (`/mcp` opens its tab) alongside Hooks, Raw Events, Extensions, and Account, and Tool input/result expands beneath its transcript row.
+The browser uses a Chinese, light-theme product shell. Established SDK concepts such as Session, Workspace, Model, Permission, MCP, Hooks, Task, Checkpoint, Credits, Skill, Command, and Tool retain their English names. Model and Permission Mode are compact Composer selectors backed by a single-page Settings dialog that also adds allowed directories through the native folder picker, MCP lives in the SDK console (`/mcp` opens its tab) alongside Hooks, Raw Events, Skills, Agents, Plugins, and Account, and Tool input/result expands beneath its transcript row.
 
 ## Run the sample
 

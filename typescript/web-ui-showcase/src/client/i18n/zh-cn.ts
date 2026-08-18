@@ -147,7 +147,6 @@ export const copy = Object.freeze({
   },
   runtime: {
     selectSession: "选择 Session 后可查看 SDK 能力。",
-    versionNotReported: "版本未报告",
     sdkDefault: "SDK default",
     additionalDirectory: "附加目录",
     addDirectory: "添加目录",

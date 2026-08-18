@@ -22,7 +22,9 @@ export type SdkConsoleTab =
   | "hooks"
   | "raw-events"
   | "mcp"
-  | "extensions"
+  | "skills"
+  | "agents"
+  | "plugins"
   | "account";
 
 /** Product-owned layout state that never arrives in a server snapshot. */

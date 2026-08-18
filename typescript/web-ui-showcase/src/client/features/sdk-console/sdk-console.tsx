@@ -26,7 +26,9 @@ const tabs: Array<{ id: SdkConsoleTab; label: string }> = [
   { id: "hooks", label: "Hooks" },
   { id: "raw-events", label: "Raw Events" },
   { id: "mcp", label: "MCP" },
-  { id: "extensions", label: "Extensions" },
+  { id: "skills", label: "Skills" },
+  { id: "agents", label: "Agents" },
+  { id: "plugins", label: "Plugins" },
   { id: "account", label: "Account" },
 ];
 
@@ -50,26 +52,36 @@ function recordLabel(record: Record<string, unknown>): string {
   return copy.common.unavailable;
 }
 
-function ExtensionsPanel(props: {
-  runtime: SessionRuntimeView;
-  reloadPlugins(): Promise<Accepted>;
-}): JSX.Element {
+function SkillsPanel(props: { runtime: SessionRuntimeView }): JSX.Element {
+  const skills = props.runtime.skills ?? [];
   return (
-    <div className="runtime-section">
-      <h3>Skills</h3>
-      <p>{props.runtime.skills?.join(", ") || copy.common.unavailable}</p>
-      <h3>Agents</h3>
-      <p>{props.runtime.agents?.map(recordLabel).join(", ") || copy.common.unavailable}</p>
-      <h3>Plugins</h3>
-      <p>{props.runtime.plugins?.map(recordLabel).join(", ") || copy.common.unavailable}</p>
-      <button
-        className="button ghost"
-        type="button"
-        onClick={() => void props.reloadPlugins().catch(() => undefined)}
-      >
-        {copy.runtime.reloadPlugins}
-      </button>
-    </div>
+    <section className="sdk-console-section">
+      <h2>Skills</h2>
+      {skills.length > 0
+        ? <ul className="skill-chips">{skills.map((skill) => <li key={skill}>{skill}</li>)}</ul>
+        : <p>暂无 Skill。</p>}
+    </section>
+  );
+}
+
+function RecordListPanel(props: {
+  title: string;
+  records: Array<Record<string, unknown>> | undefined;
+  emptyLabel: string;
+}): JSX.Element {
+  const records = props.records ?? [];
+  return (
+    <section className="sdk-console-section">
+      <h2>{props.title}</h2>
+      {records.length > 0
+        ? records.map((record, index) => (
+            <details className="sdk-console-entry" key={index}>
+              <summary>{recordLabel(record)}</summary>
+              <pre>{JSON.stringify(record, null, 2)}</pre>
+            </details>
+          ))
+        : <p>{props.emptyLabel}</p>}
+    </section>
   );
 }
 
@@ -84,10 +96,10 @@ export function SdkConsole(props: { api: SdkConsoleApi }): JSX.Element {
 
   useEffect(() => {
     if (sessionId === null) return;
-    if (tab !== "account" && tab !== "extensions") return;
+    if (tab !== "account" && tab !== "skills" && tab !== "agents" && tab !== "plugins") return;
     void track(
       props.api.refreshRuntime(sessionId),
-      tab === "account" ? "refresh-account" : "refresh-extensions",
+      tab === "account" ? "refresh-account" : "refresh-capabilities",
       sessionId,
     ).catch(() => undefined);
   }, [props.api, tab, sessionId, track]);
@@ -153,19 +165,40 @@ export function SdkConsole(props: { api: SdkConsoleApi }): JSX.Element {
         </>
       );
       break;
-    case "extensions":
+    case "skills":
+      content = (
+        <>
+          <CommandFailureNotice owner={{ surface: "runtime", control: "refresh-capabilities", sessionId }} />
+          <SkillsPanel runtime={runtime ?? emptyRuntime(sessionId)} />
+        </>
+      );
+      break;
+    case "agents":
+      content = (
+        <>
+          <CommandFailureNotice owner={{ surface: "runtime", control: "refresh-capabilities", sessionId }} />
+          <RecordListPanel title="Agents" records={runtime?.agents} emptyLabel="暂无 Agent。" />
+        </>
+      );
+      break;
+    case "plugins":
       content = (
         <>
           <CommandFailureNotice owner={[
-            { surface: "runtime", control: "refresh-extensions", sessionId },
+            { surface: "runtime", control: "refresh-capabilities", sessionId },
             { surface: "runtime", control: "plugins", sessionId },
           ]} />
-          <ExtensionsPanel
-            runtime={runtime ?? emptyRuntime(sessionId)}
-            reloadPlugins={() =>
-              track(props.api.reloadPlugins(sessionId), "plugins", sessionId)
+          <RecordListPanel title="Plugins" records={runtime?.plugins} emptyLabel="暂无 Plugin。" />
+          <button
+            className="button ghost"
+            type="button"
+            onClick={() =>
+              void track(props.api.reloadPlugins(sessionId), "plugins", sessionId)
+                .catch(() => undefined)
             }
-          />
+          >
+            {copy.runtime.reloadPlugins}
+          </button>
         </>
       );
       break;
@@ -179,13 +212,19 @@ export function SdkConsole(props: { api: SdkConsoleApi }): JSX.Element {
       break;
   }
 
+  const versionRows = [
+    runtime?.versions?.sdk === undefined ? null : `SDK ${runtime.versions.sdk}`,
+    runtime?.versions?.cli === undefined ? null : `CLI ${runtime.versions.cli}`,
+  ];
+
   return (
     <div className="sdk-console">
-      <div className="sdk-console-metadata" aria-label="Runtime 版本">
-        <strong>Runtime 版本</strong>
-        <span>SDK {runtime?.versions?.sdk ?? copy.runtime.versionNotReported}</span>
-        <span>CLI {runtime?.versions?.cli ?? copy.runtime.versionNotReported}</span>
-      </div>
+      {versionRows.every((row) => row === null) ? null : (
+        <div className="sdk-console-metadata" aria-label="Runtime 版本">
+          <strong>Runtime 版本</strong>
+          {versionRows.map((row) => row === null ? null : <span key={row}>{row}</span>)}
+        </div>
+      )}
       {runtime !== undefined && runtime.errors.length > 0 ? (
         <div className="sdk-console-errors" aria-label="Runtime 错误">
           {runtime.errors.map((error, index) => (
