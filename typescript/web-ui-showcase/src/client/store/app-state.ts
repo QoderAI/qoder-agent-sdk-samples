@@ -19,12 +19,21 @@ export type CommandFailureView = {
   sessionId?: string;
   error: WireError;
 };
+export type SdkConsoleTab =
+  | "hooks"
+  | "raw-events"
+  | "mcp"
+  | "extensions"
+  | "account";
+
 /** Product-owned layout state that never arrives in a server snapshot. */
 export type ProductViewState = {
   sidebarWidth: number;
   preferredDetailsWidth: number;
   detailsSelection: DetailsSelection;
+  settingsOpen: boolean;
   sdkConsoleOpen: boolean;
+  sdkConsoleTab: SdkConsoleTab;
   runtimeDialogSection: RuntimeDialogSection | null;
 };
 

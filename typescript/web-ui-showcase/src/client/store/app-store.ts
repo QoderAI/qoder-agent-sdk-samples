@@ -13,6 +13,7 @@ import { createInitialState, reduceServerFrame } from "./app-reducer.js";
 import type {
   AppState,
   ConnectionState,
+  SdkConsoleTab,
 } from "./app-state.js";
 import type { RuntimeDialogSection } from "../features/runtime/runtime-dialog.js";
 import {
@@ -101,10 +102,11 @@ export class AppStore {
     this.#replace({ ...this.#state, detailsSelection: null });
   }
 
-  openSdkConsole(): void {
+  openSdkConsole(tab?: SdkConsoleTab): void {
     this.#replace({
       ...this.#state,
       sdkConsoleOpen: true,
+      ...(tab === undefined ? {} : { sdkConsoleTab: tab }),
     });
   }
 
@@ -113,6 +115,18 @@ export class AppStore {
       ...this.#state,
       sdkConsoleOpen: false,
     });
+  }
+
+  setSdkConsoleTab(sdkConsoleTab: SdkConsoleTab): void {
+    this.#replace({ ...this.#state, sdkConsoleTab });
+  }
+
+  openSettings(): void {
+    this.#replace({ ...this.#state, settingsOpen: true });
+  }
+
+  closeSettings(): void {
+    this.#replace({ ...this.#state, settingsOpen: false });
   }
 
   openRuntimeDialog(runtimeDialogSection: RuntimeDialogSection): void {

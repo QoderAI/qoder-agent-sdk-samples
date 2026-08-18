@@ -84,6 +84,7 @@ function removeSession(state: AppState, sessionId: string): AppState {
     ),
     selectedSessionId: selectedRemoved ? null : state.selectedSessionId,
     runtimeDialogSection: selectedRemoved ? null : state.runtimeDialogSection,
+    settingsOpen: selectedRemoved ? false : state.settingsOpen,
     detailsSelection:
       state.detailsSelection?.sessionId === sessionId
         ? null
@@ -119,7 +120,9 @@ export function createInitialState(): AppState {
     sidebarWidth: SIDEBAR_DEFAULT,
     preferredDetailsWidth: DETAILS_DEFAULT,
     detailsSelection: null,
+    settingsOpen: false,
     sdkConsoleOpen: false,
+    sdkConsoleTab: "hooks",
     runtimeDialogSection: null,
     connectionState: "disconnected",
     protocolError: null,
