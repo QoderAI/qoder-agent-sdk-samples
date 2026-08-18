@@ -271,7 +271,7 @@ test("completes commands, semantic streaming, interactions, product details, and
   const model = page.getByLabel("Model");
   await expect(model).toBeFocused();
   await model.selectOption({ label: "Fixture model" });
-  await expect(page.getByRole("dialog", { name: "常规设置" })).toHaveCount(0);
+  await expect(page.getByRole("dialog", { name: "设置" })).toHaveCount(0);
   await expect(page.getByText("SDK_RESULT_ERROR", { exact: false })).toHaveCount(0);
 
   await composer.fill("/sample-ar");
@@ -307,19 +307,21 @@ test("completes commands, semantic streaming, interactions, product details, and
   await page.getByRole("button", { name: "SDK 控制台" }).click();
   const sdkConsole = page.getByRole("dialog", { name: "SDK 控制台" });
   await expect(sdkConsole.getByRole("heading", { name: "Hooks" })).toBeVisible();
-  await expect(sdkConsole.getByRole("heading", { name: "Raw Events" })).toBeVisible();
   await expect(sdkConsole.getByText(/FixtureSessionStart/).first()).toBeVisible();
+  await sdkConsole.getByRole("button", { name: "Raw Events" }).click();
+  await expect(sdkConsole.getByRole("heading", { name: "Raw Events" })).toBeVisible();
   await expect(
     sdkConsole.getByText("result.success", { exact: true }).last(),
   ).toBeVisible();
+  await sdkConsole.getByRole("button", { name: "Account" }).click();
+  await expect(sdkConsole).toContainText("Fixture developer");
+  await expect(sdkConsole).toContainText("42");
   await sdkConsole.getByRole("button", { name: "关闭 SDK 控制台" }).click();
 
   await page.getByRole("button", { name: "设置" }).click();
-  await page.getByRole("dialog", { name: "常规设置" }).getByRole("button", { name: "Account" }).click();
-  const account = page.getByRole("dialog", { name: "Account" });
-  await expect(account).toContainText("Fixture developer");
-  await expect(account).toContainText("42");
-  await account.getByRole("button", { name: "关闭 Account" }).click();
+  const settings = page.getByRole("dialog", { name: "设置" });
+  await expect(settings.getByRole("combobox", { name: "Model" })).toBeVisible();
+  await settings.getByRole("button", { name: "关闭 设置" }).click();
 
   const userTurn = page.getByRole("article", { name: "用户消息" }).last();
   await expect(userTurn.getByLabel("Checkpoint 范围")).toHaveCount(0);

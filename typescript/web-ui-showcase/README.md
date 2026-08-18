@@ -2,7 +2,7 @@
 
 This sample is a complete local Web UI application built with the Qoder TypeScript SDK. It is intended as an open-source application template: the product UI stays focused on project work, while the source demonstrates how Session, streaming messages, Approval, MCP, Hooks, Task, Credits, errors, Checkpoint, shutdown, and recovery fit together.
 
-The browser uses a Chinese, light-theme product shell. Established SDK concepts such as Session, Workspace, Model, Permission, MCP, Hooks, Task, Checkpoint, Credits, Skill, Command, and Tool retain their English names. Model and Permission Mode are compact Composer selectors, MCP remains in Settings and `/mcp`, and Tool input/result expands beneath its transcript row.
+The browser uses a Chinese, light-theme product shell. Established SDK concepts such as Session, Workspace, Model, Permission, MCP, Hooks, Task, Checkpoint, Credits, Skill, Command, and Tool retain their English names. Model and Permission Mode are compact Composer selectors backed by a single-page Settings dialog that also adds allowed directories through the native folder picker, MCP lives in the SDK console (`/mcp` opens its tab) alongside Hooks, Raw Events, Extensions, and Account, and Tool input/result expands beneath its transcript row.
 
 ## Run the sample
 
@@ -59,7 +59,7 @@ The conversation is a semantic projection rather than a card for every SDK event
 - turn errors stay with the affected turn and command failures stay with their control;
 - only a realtime protocol or connection failure uses the global banner.
 
-The Composer owns Session-scoped drafts. Enter sends ordinary input, Shift+Enter inserts a newline, and Enter or Tab completes an open suggestion. Arrow keys keep the active option visible. Newline-delimited SDK prompt Suggestions are normalized into separate actions; selecting one fills the draft without sending it. `/model` and `/permissions` focus their inline selectors; `/mcp` opens MCP settings. SDK Commands and Skills use the SDK input path. `@ Files` searches the Session Workspace and explicitly allowed directories without reading file content into suggestions. Only commands with an implemented execution strategy are advertised.
+The Composer owns Session-scoped drafts. Enter sends ordinary input, Shift+Enter inserts a newline, and Enter or Tab completes an open suggestion. Arrow keys keep the active option visible. Newline-delimited SDK prompt Suggestions are normalized into separate actions; selecting one fills the draft without sending it. `/model` and `/permissions` focus their inline selectors; `/mcp` opens the MCP tab in the SDK console. SDK Commands and Skills use the SDK input path. `@ Files` searches the Session Workspace and explicitly allowed directories without reading file content into suggestions. Only commands with an implemented execution strategy are advertised.
 
 The document is fixed to the viewport. The Session list, transcript, contextual details, dialogs, and suggestion lists are the intentional scroll regions. The Session header and Composer remain visible while transcript history scrolls. Desktop side panels are resizable within guarded ranges; narrow layouts use overlay panels and preserve keyboard focus.
 
@@ -86,10 +86,10 @@ Only [`src/server/sdk/`](src/server/sdk) may import `@qoder-ai/qoder-agent-sdk`.
 | Message queue and semantic stream | [`input-queue.ts`](src/server/sdk/input-queue.ts), [`message-projector.ts`](src/server/sdk/message-projector.ts) | Composer and conversation |
 | Subagent history | public SDK `listSubagents` and `getSubagentMessages` through [`session-catalog.ts`](src/server/sdk/session-catalog.ts), correlated by [`subagent-transcript-service.ts`](src/server/services/subagent-transcript-service.ts) | `Agent` Tool and contextual Details |
 | Approval and questions | [`interaction-broker.ts`](src/server/sdk/interaction-broker.ts), [`interaction-card.tsx`](src/client/features/interactions/interaction-card.tsx) | Inline conversation |
-| MCP | [`mcp-service.ts`](src/server/sdk/mcp-service.ts), [`mcp-panel.tsx`](src/client/features/mcp/mcp-panel.tsx) | Inline elicitation and MCP settings |
+| MCP | [`mcp-service.ts`](src/server/sdk/mcp-service.ts), [`mcp-panel.tsx`](src/client/features/mcp/mcp-panel.tsx) | Inline elicitation and the SDK console MCP tab |
 | Hooks | [`hooks.ts`](src/server/sdk/hooks.ts) | SDK Console |
 | Task | [`runtime-capability-service.ts`](src/server/sdk/runtime-capability-service.ts), [`runtime-routes.ts`](src/server/api/runtime-routes.ts) | SDK lifecycle state and command API without a standalone transcript card |
-| Credits and Account | [`runtime-capability-service.ts`](src/server/sdk/runtime-capability-service.ts) | Account settings |
+| Credits and Account | [`runtime-capability-service.ts`](src/server/sdk/runtime-capability-service.ts) | The SDK console Account tab |
 | Checkpoint | [`checkpoint-service.ts`](src/server/sdk/checkpoint-service.ts), [`api-client.ts`](src/client/transport/api-client.ts) | SDK adapter and API example; intentionally omitted from the product transcript |
 | Errors | [`error-handler.ts`](src/server/api/error-handler.ts), [`message-projector.ts`](src/server/sdk/message-projector.ts) | Owning turn/control or global transport banner |
 | Recovery and exit | [`realtime-hub.ts`](src/server/realtime/realtime-hub.ts), [`shutdown.ts`](src/server/shutdown.ts) | Automatic snapshot recovery and server lifecycle |
