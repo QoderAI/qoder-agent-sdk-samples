@@ -41,7 +41,7 @@ async function startSessionFromHero(
   text: string,
 ): Promise<Locator> {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "探索未至之境" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Qoder" })).toBeVisible();
   const composer = page.getByRole("textbox", { name: "消息" });
   await composer.fill(text);
   await composer.press("Enter");
@@ -425,7 +425,7 @@ test("uses accessible sidebar and SDK Console overlays at 390 by 844", async ({
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "探索未至之境" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Qoder" })).toBeVisible();
   await page.getByRole("button", { name: "项目", exact: true }).click();
   const projectDrawer = page.getByRole("dialog", { name: "项目" });
   await expect(projectDrawer).toBeVisible();

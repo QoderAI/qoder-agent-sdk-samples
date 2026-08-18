@@ -441,7 +441,7 @@ describe("conversation UI", () => {
         }],
       });
     });
-    expect(screen.getByRole("heading", { name: "探索未至之境" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Qoder" })).toBeVisible();
     expect(screen.getByLabelText("消息")).toHaveValue("");
 
     act(() => {

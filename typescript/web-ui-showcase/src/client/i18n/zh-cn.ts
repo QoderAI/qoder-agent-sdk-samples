@@ -19,7 +19,7 @@ export const copy = Object.freeze({
     pickerAccepted: "文件夹选择器已打开",
   },
   home: {
-    title: "探索未至之境",
+    title: "Qoder",
     subtitle: "从一个问题开始，Qoder 会在本地 Workspace 中创建 Session。",
     recentWorkspace: "Workspace",
     noWorkspace: "添加 Workspace 后即可开始",

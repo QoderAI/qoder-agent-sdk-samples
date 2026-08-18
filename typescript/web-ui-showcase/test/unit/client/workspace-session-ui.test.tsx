@@ -172,7 +172,7 @@ describe("Workspace and Session shell", () => {
     });
 
     expect(
-      screen.getByRole("heading", { name: "探索未至之境" }),
+      screen.getByRole("heading", { name: "Qoder" }),
     ).toBeVisible();
     expect(screen.getAllByLabelText("消息")).toHaveLength(1);
     expect(screen.getByText("Workspace：recent-repo")).toBeVisible();
@@ -638,7 +638,7 @@ describe("Workspace and Session shell", () => {
     expect(api.ensureSession).toHaveBeenCalledTimes(1);
     await user.click(screen.getByRole("button", { name: "新建 Session" }));
     act(() => store.selectSession(null));
-    expect(screen.getByRole("heading", { name: "探索未至之境" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Qoder" })).toBeVisible();
 
     await user.click(select);
     act(() => store.selectSession(sessionId));
