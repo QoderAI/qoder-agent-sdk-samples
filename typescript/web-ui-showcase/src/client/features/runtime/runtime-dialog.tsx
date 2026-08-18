@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import type {
   SelectablePermissionMode,
 } from "../../../shared/commands.js";
@@ -8,13 +8,13 @@ import {
   type RuntimeCapabilityId,
 } from "../../../shared/errors.js";
 import { copy } from "../../i18n/zh-cn.js";
-import type { CommandOwner } from "../../store/command-ownership.js";
 import { useAppState, useAppStore } from "../../store/store-context.js";
 import { CommandFailureNotice } from "../errors/command-failure-notice.js";
 import { McpPanel } from "../mcp/mcp-panel.js";
 import { CreditsAccount } from "./credits-account.js";
 import { ModelPicker } from "./model-picker.js";
 import { PermissionPicker } from "./permission-picker.js";
+import { useRuntimeTrack } from "./use-runtime-track.js";
 import { useModalFocus } from "../layout/modal-focus.js";
 
 export type RuntimeDialogSection =
@@ -110,7 +110,6 @@ export function RuntimeDialog(props: {
   onClose(): void;
 }): JSX.Element | null {
   const [directory, setDirectory] = useState("");
-  const [submissionError, setSubmissionError] = useState<string | null>(null);
   const [pendingModel, setPendingModel] = useState<{
     commandId: string | null;
     requested: string | null;
@@ -136,36 +135,15 @@ export function RuntimeDialog(props: {
   };
   const modelReason = runtimeError(runtime, "models");
   const permissionReason = runtimeError(runtime, "permission");
-  const track = useCallback(
-    async (
-      request: Promise<Accepted>,
-      control: Extract<CommandOwner, { surface: "runtime" }>["control"],
-      sessionId: string,
-    ): Promise<Accepted> => {
-      setSubmissionError(null);
-      try {
-        const accepted = await request;
-        store.registerCommand(accepted.commandId, {
-          surface: "runtime",
-          control,
-          sessionId,
-        });
-        return accepted;
-      } catch (error) {
-        setSubmissionError(copy.error.controlSubmitFailed);
-        throw error;
-      }
-    },
-    [store],
-  );
+  const { track, submissionError, clearSubmissionError } = useRuntimeTrack();
 
   useEffect(() => {
     if (props.section === null) {
-      setSubmissionError(null);
+      clearSubmissionError();
       setPendingModel(null);
       setPendingPermission(null);
     }
-  }, [props.section]);
+  }, [props.section, clearSubmissionError]);
 
   useEffect(() => {
     if (
