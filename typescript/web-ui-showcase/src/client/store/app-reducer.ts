@@ -83,7 +83,6 @@ function removeSession(state: AppState, sessionId: string): AppState {
           !removedCommandIds.has(failure.commandId)),
     ),
     selectedSessionId: selectedRemoved ? null : state.selectedSessionId,
-    runtimeDialogSection: selectedRemoved ? null : state.runtimeDialogSection,
     settingsOpen: selectedRemoved ? false : state.settingsOpen,
     detailsSelection:
       state.detailsSelection?.sessionId === sessionId
@@ -123,7 +122,6 @@ export function createInitialState(): AppState {
     settingsOpen: false,
     sdkConsoleOpen: false,
     sdkConsoleTab: "hooks",
-    runtimeDialogSection: null,
     connectionState: "disconnected",
     protocolError: null,
   };

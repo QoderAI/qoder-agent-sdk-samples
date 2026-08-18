@@ -10,7 +10,7 @@ import type { SessionActionApi } from "../sessions/session-actions.js";
 import { SessionTree } from "../sessions/session-tree.js";
 import type { ConversationApi } from "../conversation/conversation-panel.js";
 import { ConversationRoot } from "../conversation/conversation-root.js";
-import { SdkConsole } from "../sdk-console/sdk-console.js";
+import { SdkConsole, type SdkConsoleApi } from "../sdk-console/sdk-console.js";
 import { ErrorBanner } from "../errors/error-banner.js";
 import { useSessionSelection } from "../sessions/use-session-selection.js";
 import { copy } from "../../i18n/zh-cn.js";
@@ -18,13 +18,9 @@ import { AppSidebar } from "./app-sidebar.js";
 import { computeColumns } from "./columns.js";
 import { Drawer } from "./drawer.js";
 import { DetailsPanel } from "./details-panel.js";
-import {
-  RuntimeDialog,
-  type RuntimeApi,
-} from "../runtime/runtime-dialog.js";
 import { SettingsDialog, type SettingsApi } from "../runtime/settings-dialog.js";
 
-export type ShellApi = SessionActionApi & ConversationApi & RuntimeApi & SettingsApi & {
+export type ShellApi = SessionActionApi & ConversationApi & SettingsApi & SdkConsoleApi & {
   pickWorkspace(): Promise<AcceptedCommand>;
   registerWorkspace(input: { path: string }): Promise<AcceptedCommand>;
   startSession(input: StartSessionCommand): Promise<SessionStarted>;
@@ -244,22 +240,6 @@ export function AppShell(props: {
           : { runtime: state.runtime[selected.id] })}
         api={props.api}
         onClose={() => store.closeSettings()}
-      />
-      <RuntimeDialog
-        section={state.runtimeDialogSection}
-        sessionId={selected?.id ?? null}
-        {...(selected === undefined || state.runtime[selected.id] === undefined
-          ? {}
-          : { runtime: state.runtime[selected.id] })}
-        servers={selected === undefined
-          ? []
-          : state.mcpServerIds.flatMap((id) => {
-              const server = state.mcpServers[id];
-              return server?.sessionId === selected.id ? [server] : [];
-            })}
-        api={props.api}
-        onSectionChange={(section) => store.openRuntimeDialog(section)}
-        onClose={() => store.closeRuntimeDialog()}
       />
       <ErrorBanner reloadSnapshot={() => props.realtime.reloadSnapshot?.()} />
     </div>

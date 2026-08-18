@@ -15,7 +15,6 @@ import type {
   ConnectionState,
   SdkConsoleTab,
 } from "./app-state.js";
-import type { RuntimeDialogSection } from "../features/runtime/runtime-dialog.js";
 import {
   COMMAND_CORRELATION_LIMIT,
   type CommandOwner,
@@ -60,10 +59,6 @@ export class AppStore {
       serverEpoch: null,
       cursor: 0,
       detailsSelection,
-      runtimeDialogSection:
-        selectedSessionId === this.#state.selectedSessionId
-          ? this.#state.runtimeDialogSection
-          : null,
     });
   }
 
@@ -127,14 +122,6 @@ export class AppStore {
 
   closeSettings(): void {
     this.#replace({ ...this.#state, settingsOpen: false });
-  }
-
-  openRuntimeDialog(runtimeDialogSection: RuntimeDialogSection): void {
-    this.#replace({ ...this.#state, runtimeDialogSection });
-  }
-
-  closeRuntimeDialog(): void {
-    this.#replace({ ...this.#state, runtimeDialogSection: null });
   }
 
   registerCommand(commandId: string, owner: CommandOwner): void {

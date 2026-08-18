@@ -103,7 +103,7 @@ describe("application reducer", () => {
         taskId: "00000000-0000-4000-8000-000000000b06",
       },
       sdkConsoleOpen: true,
-      runtimeDialogSection: "mcp" as const,
+      settingsOpen: true,
     };
     const result = reduceServerFrame(initial, {
       kind: "snapshot",
@@ -123,7 +123,7 @@ describe("application reducer", () => {
         taskId: "00000000-0000-4000-8000-000000000b06",
       },
       sdkConsoleOpen: true,
-      runtimeDialogSection: "mcp",
+      settingsOpen: true,
     });
   });
 
@@ -218,11 +218,11 @@ describe("application reducer", () => {
   });
 
   it.each([
-    { selected: true, expectedSelected: null, expectedDialog: null },
-    { selected: false, expectedSelected: otherSessionId, expectedDialog: "mcp" },
+    { selected: true, expectedSelected: null, expectedSettingsOpen: false },
+    { selected: false, expectedSelected: otherSessionId, expectedSettingsOpen: true },
   ] as const)(
     "purges every normalized Session-owned projection when removed (selected=$selected)",
-    ({ selected, expectedSelected, expectedDialog }) => {
+    ({ selected, expectedSelected, expectedSettingsOpen }) => {
       const targetTask = `${sessionId}:task-target`;
       const otherTask = `${otherSessionId}:task-other`;
       const targetMcp = `${sessionId}:mcp-target`;
@@ -240,7 +240,7 @@ describe("application reducer", () => {
       const state = {
         ...base,
         selectedSessionId: selected ? sessionId : otherSessionId,
-        runtimeDialogSection: "mcp" as const,
+        settingsOpen: true,
         detailsSelection: {
           kind: "task" as const,
           sessionId,
@@ -365,7 +365,7 @@ describe("application reducer", () => {
         taskIds: [otherTask],
         mcpServerIds: [otherMcp],
         selectedSessionId: expectedSelected,
-        runtimeDialogSection: expectedDialog,
+        settingsOpen: expectedSettingsOpen,
         detailsSelection: null,
         commandOwnerships: [
           expect.objectContaining({ commandId: otherCommand }),

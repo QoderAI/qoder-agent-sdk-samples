@@ -65,7 +65,7 @@ describe("DSH layout state", () => {
 
     store.toggleSidebar();
     store.openSdkConsole();
-    store.openRuntimeDialog("general");
+    store.openSettings();
     store.openDetails({ kind: "task", sessionId: sessionA, taskId: "task-1" });
     store.closeDetails();
 
@@ -74,7 +74,7 @@ describe("DSH layout state", () => {
       preferredDetailsWidth: DETAILS_DEFAULT,
       detailsSelection: null,
       sdkConsoleOpen: true,
-      runtimeDialogSection: "general",
+      settingsOpen: true,
     });
   });
 

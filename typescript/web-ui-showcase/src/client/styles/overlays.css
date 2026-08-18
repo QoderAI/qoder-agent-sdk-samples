@@ -26,11 +26,6 @@
 .sdk-console-tabs button[aria-selected="true"] { background: var(--bg-selected); color: #214fba; }
 .sdk-console-panel { min-width: 0; }
 .runtime-dialog { display: grid; width: min(896px, 100%); height: min(704px, 100%); min-height: 448px; grid-template-columns: 208px minmax(0, 1fr); overflow: hidden; border: 1px solid var(--border-subtle); border-radius: 14px; background: var(--bg-base); box-shadow: var(--shadow-dialog); }
-.runtime-tabs { display: flex; min-width: 0; flex-direction: column; gap: 3px; border-right: 1px solid var(--border-subtle); padding: 16px; background: var(--bg-muted); }
-.runtime-tabs > strong { margin: 2px 6px 12px; }
-.runtime-tabs button { border: 0; border-radius: 8px; padding: 9px 10px; background: transparent; color: var(--label-secondary); text-align: left; cursor: pointer; }
-.runtime-tabs button:hover { background: var(--bg-hover); }
-.runtime-tabs button[aria-selected="true"] { background: var(--bg-selected); color: #214fba; }
 .runtime-dialog-content { display: flex; min-width: 0; min-height: 0; flex-direction: column; }
 .runtime-dialog-content > header { display: flex; min-height: 55px; flex: 0 0 auto; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--border-subtle); }
 .runtime-dialog-body { min-height: 0; flex: 1; overflow-y: auto; overflow-x: hidden; padding: 16px; }

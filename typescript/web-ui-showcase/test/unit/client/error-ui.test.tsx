@@ -14,7 +14,7 @@ import { AppErrorBoundary } from "../../../src/client/features/errors/app-error-
 import { ErrorBanner } from "../../../src/client/features/errors/error-banner.js";
 import { CommandFailureNotice } from "../../../src/client/features/errors/command-failure-notice.js";
 import { ConversationRoot } from "../../../src/client/features/conversation/conversation-root.js";
-import { RuntimeDialog } from "../../../src/client/features/runtime/runtime-dialog.js";
+import { SettingsDialog } from "../../../src/client/features/runtime/settings-dialog.js";
 import { AppShell } from "../../../src/client/features/layout/app-shell.js";
 import { useSessionSelection } from "../../../src/client/features/sessions/use-session-selection.js";
 import { AppStore } from "../../../src/client/store/app-store.js";
@@ -175,8 +175,8 @@ describe("page recovery", () => {
     };
     render(
       <StoreProvider store={store}>
-        <RuntimeDialog
-          section="general"
+        <SettingsDialog
+          open
           sessionId={sessionId}
           runtime={{
             sessionId,
@@ -188,9 +188,7 @@ describe("page recovery", () => {
             rawEvents: [],
             errors: [],
           }}
-          servers={[]}
           api={api}
-          onSectionChange={vi.fn()}
           onClose={vi.fn()}
         />
       </StoreProvider>,
@@ -242,8 +240,8 @@ describe("page recovery", () => {
     };
     render(
       <StoreProvider store={store}>
-        <RuntimeDialog
-          section="general"
+        <SettingsDialog
+          open
           sessionId={sessionId}
           runtime={{
             sessionId,
@@ -255,9 +253,7 @@ describe("page recovery", () => {
             rawEvents: [],
             errors: [],
           }}
-          servers={[]}
           api={api}
-          onSectionChange={vi.fn()}
           onClose={vi.fn()}
         />
       </StoreProvider>,

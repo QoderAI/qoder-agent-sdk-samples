@@ -3,7 +3,7 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { RuntimeDialog, type RuntimeApi } from "../../../src/client/features/runtime/runtime-dialog.js";
+import { SettingsDialog, type SettingsApi } from "../../../src/client/features/runtime/settings-dialog.js";
 import { WorkspaceDialog } from "../../../src/client/features/workspaces/workspace-dialog.js";
 import { WorkspacePanel } from "../../../src/client/features/workspaces/workspace-panel.js";
 import { Drawer } from "../../../src/client/features/layout/drawer.js";
@@ -14,21 +14,16 @@ const sessionId = "00000000-0000-4000-8000-000000000d01";
 const accepted = async () => ({
   commandId: "00000000-0000-4000-8000-000000000d02",
 });
-const runtimeApi: RuntimeApi = {
-  authenticateMcp: accepted,
-  submitMcpCallback: accepted,
-  reconnectMcp: accepted,
+const settingsApi: SettingsApi = {
   setModel: accepted,
   setPermissionMode: accepted,
-  addDirectories: accepted,
-  refreshRuntime: accepted,
-  reloadPlugins: accepted,
+  pickAndAddDirectory: accepted,
 };
 
 afterEach(cleanup);
 
 describe("shared modal focus lifecycle", () => {
-  it("traps RuntimeDialog focus, uses the latest Escape callback, and restores its trigger", async () => {
+  it("traps SettingsDialog focus, uses the latest Escape callback, and restores its trigger", async () => {
     const user = userEvent.setup();
     const trigger = document.createElement("button");
     document.body.append(trigger);
@@ -37,8 +32,8 @@ describe("shared modal focus lifecycle", () => {
     const latestClose = vi.fn();
     const view = (onClose: () => void) => (
       <StoreProvider store={new AppStore()}>
-        <RuntimeDialog
-          section="general"
+        <SettingsDialog
+          open
           sessionId={sessionId}
           runtime={{
             sessionId,
@@ -50,16 +45,14 @@ describe("shared modal focus lifecycle", () => {
             rawEvents: [],
             errors: [],
           }}
-          servers={[]}
-          api={runtimeApi}
-          onSectionChange={() => undefined}
+          api={settingsApi}
           onClose={onClose}
         />
       </StoreProvider>
     );
     const rendered = render(view(firstClose));
-    const dialog = screen.getByRole("dialog", { name: "常规设置" });
-    const close = within(dialog).getByRole("button", { name: "关闭 常规设置" });
+    const dialog = screen.getByRole("dialog", { name: "设置" });
+    const close = within(dialog).getByRole("button", { name: "关闭 设置" });
     expect(close).toHaveFocus();
 
     const permission = within(dialog).getByLabelText("Permission");
@@ -81,12 +74,10 @@ describe("shared modal focus lifecycle", () => {
 
     rendered.rerender(
       <StoreProvider store={new AppStore()}>
-        <RuntimeDialog
-          section={null}
+        <SettingsDialog
+          open={false}
           sessionId={sessionId}
-          servers={[]}
-          api={runtimeApi}
-          onSectionChange={() => undefined}
+          api={settingsApi}
           onClose={latestClose}
         />
       </StoreProvider>,

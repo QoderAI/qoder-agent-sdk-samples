@@ -1,6 +1,5 @@
 import type { WireError } from "../../shared/errors.js";
 import type { DetailsSelection } from "../features/layout/details-selection.js";
-import type { RuntimeDialogSection } from "../features/runtime/runtime-dialog.js";
 import type { CommandOwnership } from "./command-ownership.js";
 import type {
   ConversationItem,
@@ -34,7 +33,6 @@ export type ProductViewState = {
   settingsOpen: boolean;
   sdkConsoleOpen: boolean;
   sdkConsoleTab: SdkConsoleTab;
-  runtimeDialogSection: RuntimeDialogSection | null;
 };
 
 export type AppState = ProductViewState & {
