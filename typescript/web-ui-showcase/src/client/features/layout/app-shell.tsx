@@ -22,8 +22,9 @@ import {
   RuntimeDialog,
   type RuntimeApi,
 } from "../runtime/runtime-dialog.js";
+import { SettingsDialog, type SettingsApi } from "../runtime/settings-dialog.js";
 
-export type ShellApi = SessionActionApi & ConversationApi & RuntimeApi & {
+export type ShellApi = SessionActionApi & ConversationApi & RuntimeApi & SettingsApi & {
   pickWorkspace(): Promise<AcceptedCommand>;
   registerWorkspace(input: { path: string }): Promise<AcceptedCommand>;
   startSession(input: StartSessionCommand): Promise<SessionStarted>;
@@ -149,7 +150,7 @@ export function AppShell(props: {
         selectedSessionId={state.selectedSessionId}
         onSelectSession={sessionSelection.selectSession}
         onNewSession={newSession}
-        onOpenSettings={() => store.openRuntimeDialog("general")}
+        onOpenSettings={() => store.openSettings()}
         onOpenSdkConsole={() => store.openSdkConsole()}
         onToggle={() => {
           if (viewportWidth < 1_024) setProjectDrawer(true);
@@ -235,6 +236,15 @@ export function AppShell(props: {
       >
         <SdkConsole api={props.api} />
       </Drawer>
+      <SettingsDialog
+        open={state.settingsOpen}
+        sessionId={selected?.id ?? null}
+        {...(selected === undefined || state.runtime[selected.id] === undefined
+          ? {}
+          : { runtime: state.runtime[selected.id] })}
+        api={props.api}
+        onClose={() => store.closeSettings()}
+      />
       <RuntimeDialog
         section={state.runtimeDialogSection}
         sessionId={selected?.id ?? null}

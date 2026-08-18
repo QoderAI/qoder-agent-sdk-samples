@@ -144,7 +144,7 @@ export function ConversationRoot(props: {
             });
             return accepted;
           },
-          openMcp: () => store.openRuntimeDialog("mcp"),
+          openMcp: () => store.openSdkConsole("mcp"),
           ...(modelFailure === undefined
             ? {}
             : {

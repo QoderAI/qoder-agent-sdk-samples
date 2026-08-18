@@ -135,6 +135,7 @@ function setup(options: {
     setModel: vi.fn(accepted),
     setPermissionMode: vi.fn(accepted),
     addDirectories: vi.fn(accepted),
+    pickAndAddDirectory: vi.fn(accepted),
     refreshRuntime: vi.fn(accepted),
     refreshContext: vi.fn(accepted),
     reloadPlugins: vi.fn(accepted),
@@ -187,7 +188,7 @@ describe("runtime product settings", () => {
     expect(model).toHaveValue("performance");
     expect(model).toBeEnabled();
     expect(model).toHaveValue("performance");
-    expect(screen.queryByRole("dialog", { name: "常规设置" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "设置" })).not.toBeInTheDocument();
   });
 
   it("shows an async Model failure beside the control and restores the prior selection", async () => {
@@ -223,10 +224,10 @@ describe("runtime product settings", () => {
     expect(model).toHaveValue("balanced");
     expect(model).toBeEnabled();
     expect(model).toHaveValue("balanced");
-    expect(screen.queryByRole("dialog", { name: "常规设置" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "设置" })).not.toBeInTheDocument();
   });
 
-  it("changes Model and Permission inline while keeping MCP in Settings", async () => {
+  it("changes Model and Permission inline while routing MCP to the SDK console", async () => {
     const user = userEvent.setup();
     const { api } = setup();
 
@@ -240,52 +241,72 @@ describe("runtime product settings", () => {
     await user.selectOptions(permission, "auto");
     expect(api.setPermissionMode).toHaveBeenCalledWith(sessionId, "auto");
     expect(screen.queryByRole("button", { name: "MCP" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("dialog", { name: "常规设置" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "设置" })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "设置" }));
-    let dialog = screen.getByRole("dialog", { name: "常规设置" });
-    await user.type(within(dialog).getByLabelText("附加目录"), "/shared");
+    const dialog = screen.getByRole("dialog", { name: "设置" });
     await user.click(within(dialog).getByRole("button", { name: "添加目录" }));
-    expect(api.addDirectories).toHaveBeenCalledWith(sessionId, ["/shared"]);
-    expect(within(dialog).getByLabelText("附加目录")).toHaveValue("");
-    await user.click(within(dialog).getByRole("button", { name: "关闭 常规设置" }));
+    expect(api.pickAndAddDirectory).toHaveBeenCalledWith(sessionId);
+    await user.click(within(dialog).getByRole("button", { name: "关闭 设置" }));
 
     await user.type(screen.getByLabelText("消息"), "/mcp{Enter}");
-    dialog = screen.getByRole("dialog", { name: "MCP" });
-    await user.click(within(dialog).getByRole("button", { name: "授权" }));
+    const consoleDialog = screen.getByRole("dialog", { name: "SDK 控制台" });
+    expect(
+      within(consoleDialog).getByRole("button", { name: "MCP" }),
+    ).toHaveAttribute("aria-selected", "true");
+    await user.click(within(consoleDialog).getByRole("button", { name: "授权" }));
     expect(api.authenticateMcp).toHaveBeenCalledWith(sessionId, "github");
-    await user.type(within(dialog).getByLabelText("OAuth callback URL"), "https://localhost/callback?code=secret");
-    await user.click(within(dialog).getByRole("button", { name: "提交 callback" }));
+    await user.type(within(consoleDialog).getByLabelText("OAuth callback URL"), "https://localhost/callback?code=secret");
+    await user.click(within(consoleDialog).getByRole("button", { name: "提交 callback" }));
     expect(api.submitMcpCallback).toHaveBeenCalledWith(
       sessionId,
       "github",
       "https://localhost/callback?code=secret",
     );
-    await user.click(within(dialog).getByRole("button", { name: "重新连接 Session" }));
+    await user.click(within(consoleDialog).getByRole("button", { name: "重新连接 Session" }));
     expect(api.reconnectMcp).toHaveBeenCalledWith(sessionId, "github");
     expect(api.sendMessage).not.toHaveBeenCalled();
   });
 
-  it("refreshes Account and Extensions once when opened from sidebar settings", async () => {
+  it("refreshes Account and Extensions once per SDK console tab", async () => {
     const user = userEvent.setup();
     const { api } = setup();
 
-    await user.click(screen.getByRole("button", { name: "设置" }));
-    let dialog = screen.getByRole("dialog", { name: "常规设置" });
+    await user.click(screen.getByRole("button", { name: "SDK 控制台" }));
+    const dialog = screen.getByRole("dialog", { name: "SDK 控制台" });
     await user.click(within(dialog).getByRole("button", { name: "Account" }));
-    dialog = screen.getByRole("dialog", { name: "Account" });
     expect(await within(dialog).findByText("developer@example.com")).toBeVisible();
     expect(within(dialog).getByText("Credits")).toBeVisible();
     expect(api.refreshRuntime).toHaveBeenCalledTimes(1);
 
     await user.click(within(dialog).getByRole("button", { name: "Extensions" }));
-    dialog = screen.getByRole("dialog", { name: "Extensions" });
     expect(within(dialog).getByText("review")).toBeVisible();
     expect(within(dialog).getByText("general")).toBeVisible();
     expect(within(dialog).getByText("fixture-plugin")).toBeVisible();
     expect(api.refreshRuntime).toHaveBeenCalledTimes(2);
     await user.click(within(dialog).getByRole("button", { name: "重新加载 Plugins" }));
     expect(api.reloadPlugins).toHaveBeenCalledWith(sessionId);
+  });
+
+  it("adds an allowed directory through the native picker command", async () => {
+    const user = userEvent.setup();
+    const { api } = setup();
+
+    await user.click(screen.getByRole("button", { name: "设置" }));
+    const dialog = screen.getByRole("dialog", { name: "设置" });
+    await user.click(within(dialog).getByRole("button", { name: "添加目录" }));
+    expect(api.pickAndAddDirectory).toHaveBeenCalledWith(sessionId);
+  });
+
+  it("shows no section tabs inside Settings", async () => {
+    const user = userEvent.setup();
+    setup();
+
+    await user.click(screen.getByRole("button", { name: "设置" }));
+    const dialog = screen.getByRole("dialog", { name: "设置" });
+    expect(within(dialog).queryByRole("button", { name: "Account" })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: "Extensions" })).not.toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "添加目录" })).toBeVisible();
   });
 
   it("disables only an unavailable runtime control and leaves Send usable", async () => {

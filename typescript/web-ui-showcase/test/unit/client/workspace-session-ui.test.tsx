@@ -148,6 +148,7 @@ function setup(options: {
     setModel: vi.fn(accepted),
     setPermissionMode: vi.fn(accepted),
     addDirectories: vi.fn(accepted),
+    pickAndAddDirectory: vi.fn(accepted),
     refreshRuntime: vi.fn(accepted),
     refreshContext: vi.fn(accepted),
     reloadPlugins: vi.fn(accepted),
@@ -519,7 +520,7 @@ describe("Workspace and Session shell", () => {
     expect(await screen.findByRole("option", { name: /src\/app.ts/ })).toBeInTheDocument();
   });
 
-  it("targets inline Composer controls while MCP stays in product settings", async () => {
+  it("targets inline Composer controls while MCP routes to the SDK console", async () => {
     const user = userEvent.setup();
     const controls: ComposerCommandView[] = [
       {
@@ -559,9 +560,11 @@ describe("Workspace and Session shell", () => {
 
     await user.click(screen.getByLabelText("消息"));
     await user.type(screen.getByLabelText("消息"), "/mc{Enter}");
-    const dialog = await screen.findByRole("dialog", { name: "MCP" });
+    const dialog = await screen.findByRole("dialog", { name: "SDK 控制台" });
+    expect(
+      within(dialog).getByRole("button", { name: "MCP" }),
+    ).toHaveAttribute("aria-selected", "true");
     expect(within(dialog).getByText("MCP Servers")).toBeVisible();
-    expect(within(dialog).queryByRole("navigation", { name: "Inspector 分区" })).not.toBeInTheDocument();
     expect(screen.getByLabelText("消息")).toHaveValue("");
     expect(api.sendMessage).not.toHaveBeenCalled();
   });

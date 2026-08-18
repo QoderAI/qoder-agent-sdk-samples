@@ -169,6 +169,7 @@ describe("page recovery", () => {
       setModel: vi.fn(async () => ({ commandId: modelCommandId })),
       setPermissionMode: vi.fn(async () => ({ commandId: permissionCommandId })),
       addDirectories: vi.fn(accepted),
+      pickAndAddDirectory: vi.fn(accepted),
       refreshRuntime: vi.fn(accepted),
       reloadPlugins: vi.fn(accepted),
     };
@@ -235,6 +236,7 @@ describe("page recovery", () => {
       setModel: vi.fn().mockRejectedValue(new Error("credential=secret")),
       setPermissionMode: vi.fn(accepted),
       addDirectories: vi.fn(accepted),
+      pickAndAddDirectory: vi.fn(accepted),
       refreshRuntime: vi.fn(accepted),
       reloadPlugins: vi.fn(accepted),
     };
@@ -541,6 +543,7 @@ describe("page recovery", () => {
       setModel: vi.fn(accepted),
       setPermissionMode: vi.fn(accepted),
       addDirectories: vi.fn(accepted),
+      pickAndAddDirectory: vi.fn(accepted),
       refreshRuntime: vi.fn(accepted),
       reloadPlugins: vi.fn(accepted),
     };

@@ -90,6 +90,7 @@ function setupShell(options: {
     setModel: vi.fn(accepted),
     setPermissionMode: vi.fn(accepted),
     addDirectories: vi.fn(accepted),
+    pickAndAddDirectory: vi.fn(accepted),
     refreshRuntime: vi.fn(accepted),
     reloadPlugins: vi.fn(accepted),
     generateTitle: vi.fn(accepted),
