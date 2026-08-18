@@ -71,6 +71,20 @@ export async function registerRuntimeRoutes(
   });
 
   app.post(
+    "/api/sessions/:sessionId/directories/pick",
+    async (request, reply) => {
+      const { sessionId } = sessionParamsSchema.parse(request.params);
+      emptyCommandSchema.parse(request.body ?? {});
+      options.runtime.requireLive(sessionId);
+      const accepted = options.commandRunner.accept({
+        sessionId,
+        execute: () => options.runtime.pickAndAddDirectory(sessionId),
+      });
+      return reply.code(202).send(commandAcceptedSchema.parse(accepted));
+    },
+  );
+
+  app.post(
     "/api/sessions/:sessionId/tasks/:taskId/stop",
     async (request, reply) => {
       const { sessionId, taskId } = taskParamsSchema.parse(request.params);

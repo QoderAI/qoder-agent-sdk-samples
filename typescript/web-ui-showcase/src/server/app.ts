@@ -184,6 +184,7 @@ export async function createApp(
     registry: sessionRegistry,
     runtimeState: sessionRuntime,
     mcp,
+    picker: directoryPicker,
     refreshSessionMetadata: (sessionId, title) =>
       sessionService?.refreshMetadata(sessionId, title) ?? Promise.resolve(),
     includeRawEvents: config.rawEvents,

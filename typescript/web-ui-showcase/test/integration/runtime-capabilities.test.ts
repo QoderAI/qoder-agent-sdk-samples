@@ -112,6 +112,7 @@ describe("runtime capability controls", () => {
         registry,
         restartSession: async () => undefined,
       }),
+      picker: { pick: async () => null },
       refreshSessionMetadata: async () => undefined,
       includeRawEvents: false,
     });
@@ -147,6 +148,7 @@ describe("runtime capability controls", () => {
         registry,
         restartSession: async () => undefined,
       }),
+      picker: { pick: async () => null },
       refreshSessionMetadata: async () => undefined,
     });
 
@@ -190,6 +192,7 @@ describe("runtime capability controls", () => {
         registry,
         restartSession: async () => undefined,
       }),
+      picker: { pick: async () => null },
       refreshSessionMetadata: async () => undefined,
     });
 
@@ -228,6 +231,7 @@ describe("runtime capability controls", () => {
         registry,
         restartSession: async () => undefined,
       }),
+      picker: { pick: async () => null },
       refreshSessionMetadata: async () => undefined,
     });
 
@@ -269,6 +273,7 @@ describe("runtime capability controls", () => {
       registry,
       runtimeState,
       mcp,
+      picker: { pick: async () => null },
       refreshSessionMetadata: refreshMetadata,
     });
 
@@ -335,6 +340,7 @@ describe("runtime capability controls", () => {
         registry,
         restartSession: async () => undefined,
       }),
+      picker: { pick: async () => null },
       refreshSessionMetadata: async () => undefined,
     });
     const commandId = "00000000-0000-4000-8000-000000000912";
@@ -397,6 +403,7 @@ describe("runtime capability controls", () => {
         registry,
         restartSession: async () => undefined,
       }),
+      picker: { pick: async () => null },
       refreshSessionMetadata: async () => undefined,
     });
 
@@ -451,6 +458,7 @@ describe("runtime capability controls", () => {
         registry,
         restartSession: async () => undefined,
       }),
+      picker: { pick: async () => null },
       refreshSessionMetadata: async () => undefined,
     });
 
@@ -513,6 +521,7 @@ describe("runtime capability controls", () => {
         registry,
         restartSession: async () => undefined,
       }),
+      picker: { pick: async () => null },
       refreshSessionMetadata: async () => undefined,
     });
 
@@ -561,6 +570,7 @@ describe("runtime capability controls", () => {
       registry,
       runtimeState,
       mcp,
+      picker: { pick: async () => null },
       refreshSessionMetadata: async () => undefined,
     });
 

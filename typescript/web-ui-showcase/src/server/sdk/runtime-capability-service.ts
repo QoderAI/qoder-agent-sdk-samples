@@ -6,6 +6,7 @@ import {
   type SessionRuntimeView,
 } from "../../shared/model.js";
 import { AppError } from "../errors/app-error.js";
+import type { DirectoryPicker } from "../platform/directory-picker.js";
 import { validateWorkspacePath } from "../platform/path-policy.js";
 import type { EventJournal } from "../realtime/event-journal.js";
 import type { SessionRuntimePatch } from "./session-runtime-state.js";
@@ -55,6 +56,7 @@ export class RuntimeCapabilityService {
   readonly #modelGenerations = new Map<string, number>();
   readonly #permissionGenerations = new Map<string, number>();
   readonly #includeRawEvents: boolean;
+  readonly #picker: DirectoryPicker;
   readonly #refreshSessionMetadata: (
     sessionId: string,
     title?: string,
@@ -65,6 +67,7 @@ export class RuntimeCapabilityService {
     registry: SessionRegistry;
     runtimeState: SessionRuntimeState;
     mcp: McpService;
+    picker: DirectoryPicker;
     refreshSessionMetadata: (
       sessionId: string,
       title?: string,
@@ -75,6 +78,7 @@ export class RuntimeCapabilityService {
     this.#registry = options.registry;
     this.#runtimeState = options.runtimeState;
     this.#mcp = options.mcp;
+    this.#picker = options.picker;
     this.#refreshSessionMetadata = options.refreshSessionMetadata;
     this.#includeRawEvents = options.includeRawEvents ?? true;
   }
@@ -222,6 +226,14 @@ export class RuntimeCapabilityService {
           : {}),
       });
     });
+  }
+
+  async pickAndAddDirectory(sessionId: string): Promise<void> {
+    const picked = await this.#picker.pick();
+    if (picked === null) {
+      return;
+    }
+    await this.addDirectories(sessionId, [picked]);
   }
 
   async stopTask(sessionId: string, taskId: string): Promise<void> {
