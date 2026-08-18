@@ -12,7 +12,10 @@
 .session-search { display: grid; gap: 4px; color: var(--label-secondary); font-size: 12px; }
 .session-search input { width: 100%; border: 1px solid var(--border-subtle); border-radius: 8px; padding: 7px 9px; background: var(--bg-base); color: var(--label-primary); }
 .workspace-group { position: relative; border-top: 1px solid var(--border-subtle); padding-top: 8px; }
-.workspace-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; padding: 0 2px; cursor: pointer; }
+.workspace-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; padding: 0 2px; cursor: pointer; list-style: none; }
+.workspace-heading::-webkit-details-marker { display: none; }
+.workspace-heading::before { content: "▾"; flex: 0 0 auto; margin-top: 2px; color: var(--label-secondary); font-size: 11px; line-height: 16px; }
+.workspace-group:not([open]) > .workspace-heading::before { content: "▸"; }
 .workspace-heading div { display: grid; min-width: 0; flex: 1; gap: 1px; }
 .workspace-heading small { max-width: 190px; overflow: hidden; color: var(--label-secondary); text-overflow: ellipsis; white-space: nowrap; }
 .workspace-new-session { flex: 0 0 auto; color: var(--label-secondary); font-size: 16px; line-height: 1; }
