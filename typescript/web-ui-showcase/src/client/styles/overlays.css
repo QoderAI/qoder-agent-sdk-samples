@@ -1,0 +1,58 @@
+.menu-panel { position: fixed; z-index: 55; width: 176px; padding: 5px; border: 1px solid var(--border-subtle); border-radius: 10px; background: var(--bg-base); box-shadow: var(--shadow-floating); }
+.menu-panel button { width: 100%; border-color: transparent; padding: 7px 9px; text-align: left; }
+.dialog-backdrop, .runtime-dialog-backdrop { position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; padding: 16px; overflow: hidden; background: rgba(27, 33, 43, 0.34); }
+.dialog { width: min(448px, 100%); max-height: calc(100dvh - 32px); overflow-y: auto; border: 1px solid var(--border-subtle); border-radius: 14px; padding: 20px; background: var(--bg-base); box-shadow: var(--shadow-dialog); }
+.dialog h2 { margin: 0 0 16px; font-size: 17px; }
+.dialog form { display: grid; gap: 10px; }
+.dialog input { width: 100%; border: 1px solid var(--border-strong); border-radius: 8px; padding: 10px; background: var(--bg-base); }
+.dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+.drawer-backdrop { position: fixed; inset: 0; z-index: 50; display: flex; justify-content: flex-end; overflow: hidden; background: rgba(27, 33, 43, 0.34); }
+.drawer { display: flex; width: min(448px, 92vw); height: 100dvh; min-height: 0; flex-direction: column; overflow: hidden; border-left: 1px solid var(--border-subtle); padding: 0 14px 14px; background: var(--bg-sidebar); box-shadow: -12px 0 36px rgba(26, 31, 39, 0.16); }
+.drawer > header { display: flex; min-height: 55px; flex: 0 0 auto; align-items: center; justify-content: space-between; margin: 0 -14px 14px; padding: 12px 14px; border-bottom: 1px solid var(--border-subtle); background: var(--bg-base); }
+.drawer > :not(header) { min-height: 0; overflow-y: auto; }
+.sdk-console { display: grid; gap: 14px; color: var(--label-secondary); }
+.sdk-console-metadata { display: flex; flex-wrap: wrap; align-items: baseline; gap: 7px 14px; }
+.sdk-console-errors { border: 1px solid #efc6ca; border-radius: 9px; padding: 10px; color: var(--danger); background: var(--danger-surface); }
+.sdk-console-errors p { margin: 4px 0; }
+.sdk-console-section { min-width: 0; }
+.sdk-console-section h2 { color: var(--label-primary); font-size: 14px; }
+.sdk-console-entry { display: block; min-width: 0; margin: 8px 0; border: 1px solid var(--border-subtle); border-radius: 9px; padding: 10px; background: var(--bg-base); }
+.sdk-console-entry summary { color: var(--label-primary); font-weight: 600; cursor: pointer; }
+.sdk-console-entry pre { max-width: 100%; overflow: auto; margin-bottom: 0; border: 1px solid var(--border-subtle); border-radius: 8px; padding: 10px; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--bg-muted); color: #4f5966; font-size: 11px; }
+.sdk-console-empty { color: var(--label-secondary); }
+.runtime-dialog { display: grid; width: min(896px, 100%); height: min(704px, 100%); min-height: 448px; grid-template-columns: 208px minmax(0, 1fr); overflow: hidden; border: 1px solid var(--border-subtle); border-radius: 14px; background: var(--bg-base); box-shadow: var(--shadow-dialog); }
+.runtime-tabs { display: flex; min-width: 0; flex-direction: column; gap: 3px; border-right: 1px solid var(--border-subtle); padding: 16px; background: var(--bg-muted); }
+.runtime-tabs > strong { margin: 2px 6px 12px; }
+.runtime-tabs button { border: 0; border-radius: 8px; padding: 9px 10px; background: transparent; color: var(--label-secondary); text-align: left; cursor: pointer; }
+.runtime-tabs button:hover { background: var(--bg-hover); }
+.runtime-tabs button[aria-selected="true"] { background: var(--bg-selected); color: #214fba; }
+.runtime-dialog-content { display: flex; min-width: 0; min-height: 0; flex-direction: column; }
+.runtime-dialog-content > header { display: flex; min-height: 55px; flex: 0 0 auto; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--border-subtle); }
+.runtime-dialog-body { min-height: 0; flex: 1; overflow-y: auto; overflow-x: hidden; padding: 16px; }
+.runtime-section { display: grid; gap: 10px; color: var(--label-secondary); }
+.runtime-section h3 { margin: 8px 0 0; color: var(--label-primary); font-size: 14px; }
+.runtime-section label { display: grid; gap: 4px; font-size: 12px; }
+.runtime-section input, .runtime-section select { width: 100%; border: 1px solid var(--border-strong); border-radius: 8px; padding: 8px; background: var(--bg-base); }
+.runtime-section form { display: grid; gap: 8px; }
+.runtime-section ul { margin: 0; padding-left: 20px; overflow-wrap: anywhere; }
+.runtime-card { display: grid; gap: 8px; border: 1px solid var(--border-subtle); border-radius: 10px; padding: 10px; background: var(--bg-base); }
+.runtime-card header { display: flex; justify-content: space-between; gap: 8px; }
+.runtime-fields { display: grid; gap: 7px; margin: 0; }
+.runtime-fields div { display: grid; grid-template-columns: minmax(96px, auto) minmax(0, 1fr); gap: 10px; }
+.runtime-fields dt { color: var(--label-primary); font-weight: 600; }
+.runtime-fields dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
+.error-banner { position: fixed; right: 16px; bottom: 16px; z-index: 80; display: flex; max-width: min(608px, calc(100vw - 32px)); align-items: center; gap: 16px; border: 1px solid #efc6ca; border-radius: 12px; padding: 11px; background: var(--danger-surface); box-shadow: var(--shadow-floating); }
+.error-banner > div { display: flex; align-items: center; gap: 8px; }
+.error-banner > div:first-child { display: grid; }
+.error-banner span { color: #8c4c53; font-size: 12px; }
+.fatal-fallback { display: grid; min-height: 100vh; place-content: center; justify-items: center; padding: 32px; background: var(--bg-base); text-align: center; }
+@media (max-width: 639px) {
+  .drawer { width: min(340px, 92vw); }
+  .runtime-dialog-backdrop { padding: 0; }
+  .runtime-dialog { width: 100%; height: 100dvh; min-height: 0; grid-template-columns: minmax(0, 1fr); border-radius: 0; }
+  .runtime-tabs { flex-direction: row; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--border-subtle); padding: 10px; }
+  .runtime-tabs > strong { display: none; }
+  .runtime-tabs button { flex: 0 0 auto; }
+  .dialog-backdrop { padding: 10px; }
+  .error-banner { right: 10px; bottom: 10px; left: 10px; max-width: none; }
+}
