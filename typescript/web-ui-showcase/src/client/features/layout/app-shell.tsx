@@ -233,7 +233,7 @@ export function AppShell(props: {
         title="SDK 控制台"
         onClose={() => store.closeSdkConsole()}
       >
-        <SdkConsole />
+        <SdkConsole api={props.api} />
       </Drawer>
       <RuntimeDialog
         section={state.runtimeDialogSection}

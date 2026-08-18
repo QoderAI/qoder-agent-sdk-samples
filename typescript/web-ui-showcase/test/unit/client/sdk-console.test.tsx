@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AppShell } from "../../../src/client/features/layout/app-shell.js";
 import { AppStore } from "../../../src/client/store/app-store.js";
 import { StoreProvider } from "../../../src/client/store/store-context.js";
+import { copy } from "../../../src/client/i18n/zh-cn.js";
 import type { AppSnapshot } from "../../../src/shared/snapshots.js";
 
 const workspaceId = "00000000-0000-4000-8000-000000000f01";
@@ -15,7 +16,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function setup(options: { omitVersions?: boolean } = {}): void {
+function setup(options: { omitVersions?: boolean } = {}) {
   const store = new AppStore();
   const snapshot: AppSnapshot = {
     serverEpoch: "sdk-console",
@@ -40,7 +41,12 @@ function setup(options: { omitVersions?: boolean } = {}): void {
     queuedInputs: [],
     interactions: [],
     tasks: [],
-    mcpServers: [],
+    mcpServers: [{
+      sessionId,
+      name: "github",
+      status: "needs-auth",
+      authUrl: "https://auth.example/authorize",
+    }],
     checkpointPreviews: [],
     runtime: {
       [sessionId]: {
@@ -89,6 +95,7 @@ function setup(options: { omitVersions?: boolean } = {}): void {
     setModel: vi.fn(accepted),
     setPermissionMode: vi.fn(accepted),
     addDirectories: vi.fn(accepted),
+    pickAndAddDirectory: vi.fn(accepted),
     refreshRuntime: vi.fn(accepted),
     refreshContext: vi.fn(accepted),
     reloadPlugins: vi.fn(accepted),
@@ -100,6 +107,7 @@ function setup(options: { omitVersions?: boolean } = {}): void {
       <AppShell api={api} realtime={{ selectSession: vi.fn() }} />
     </StoreProvider>,
   );
+  return { api };
 }
 
 describe("SDK console", () => {
@@ -116,9 +124,7 @@ describe("SDK console", () => {
     const dialog = screen.getByRole("dialog", { name: "SDK 控制台" });
     expect(dialog).toBeVisible();
     expect(within(dialog).getByRole("heading", { name: "Hooks" })).toBeVisible();
-    expect(within(dialog).getByRole("heading", { name: "Raw Events" })).toBeVisible();
     expect(within(dialog).getByText("PreToolUse")).toBeVisible();
-    expect(within(dialog).getByText("system.init")).toBeVisible();
     expect(within(dialog).getByText("SDK 1.2.3")).toBeVisible();
     expect(within(dialog).getByText("CLI 4.5.6")).toBeVisible();
     expect(within(dialog).getByText("The SDK runtime reported a safe error.")).toBeVisible();
@@ -126,6 +132,10 @@ describe("SDK console", () => {
     expect(within(dialog).queryByText("hiddenProductContext")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("SDK Inspector")).not.toBeInTheDocument();
     expect(screen.queryByRole("navigation", { name: "Inspector 分区" })).not.toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole("button", { name: "Raw Events" }));
+    expect(within(dialog).getByText("system.init")).toBeVisible();
+    expect(within(dialog).queryByRole("heading", { name: "Hooks" })).not.toBeInTheDocument();
   });
 
   it("describes unreported SDK and CLI versions without implying unavailability", async () => {
@@ -138,5 +148,32 @@ describe("SDK console", () => {
     expect(within(dialog).getByText("SDK 版本未报告")).toBeVisible();
     expect(within(dialog).getByText("CLI 版本未报告")).toBeVisible();
     expect(within(dialog).queryByText(/不可用/u)).not.toBeInTheDocument();
+  });
+
+  it("moves MCP operations into the SDK console tab", async () => {
+    const user = userEvent.setup();
+    const { api } = setup();
+
+    await user.click(screen.getByRole("button", { name: "SDK 控制台" }));
+    const dialog = screen.getByRole("dialog", { name: "SDK 控制台" });
+    await user.click(within(dialog).getByRole("button", { name: "MCP" }));
+
+    await user.click(
+      await within(dialog).findByRole("button", { name: copy.runtime.authenticate }),
+    );
+    expect(api.authenticateMcp).toHaveBeenCalledWith(sessionId, "github");
+  });
+
+  it("refreshes Account data when the Account tab is opened", async () => {
+    const user = userEvent.setup();
+    const { api } = setup();
+
+    await user.click(screen.getByRole("button", { name: "SDK 控制台" }));
+    const dialog = screen.getByRole("dialog", { name: "SDK 控制台" });
+    await user.click(within(dialog).getByRole("button", { name: "Account" }));
+
+    await waitFor(() =>
+      expect(api.refreshRuntime).toHaveBeenCalledWith(sessionId),
+    );
   });
 });
