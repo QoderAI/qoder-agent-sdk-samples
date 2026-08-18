@@ -14,7 +14,7 @@
 .workspace-group { position: relative; border-top: 1px solid var(--border-subtle); padding-top: 8px; }
 .workspace-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; padding: 0 2px; cursor: pointer; list-style: none; }
 .workspace-heading::-webkit-details-marker { display: none; }
-.workspace-heading::before { content: "▾"; flex: 0 0 auto; margin-top: 1px; color: var(--label-secondary); font-size: 13px; line-height: 16px; }
+.workspace-heading::before { content: "▾"; flex: 0 0 auto; margin-top: 0; color: var(--label-secondary); font-size: 16px; line-height: 18px; }
 .workspace-group:not([open]) > .workspace-heading::before { content: "▸"; }
 .workspace-heading div { display: grid; min-width: 0; flex: 1; gap: 1px; }
 .workspace-heading small { max-width: 190px; overflow: hidden; color: var(--label-secondary); text-overflow: ellipsis; white-space: nowrap; }
