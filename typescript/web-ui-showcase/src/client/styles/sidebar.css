@@ -2,7 +2,7 @@
 .brand-block { display: flex; height: 60px; flex: 0 0 auto; align-items: center; gap: 10px; padding: 8px 4px; }
 .brand-block > div { display: grid; min-width: 0; flex: 1; gap: 1px; }
 .brand-block small { color: var(--label-secondary); font-size: 12px; }
-.brand-mark { display: grid; width: 30px; height: 30px; flex: 0 0 auto; place-items: center; border-radius: 9px; background: var(--business-primary); color: #fff; font-weight: 800; }
+.brand-mark { width: 30px; height: 30px; flex: 0 0 auto; border-radius: 7px; }
 .sidebar-icon-button, .sidebar-foot-action { border: 1px solid transparent; background: transparent; cursor: pointer; }
 .sidebar-icon-button { display: grid; width: 28px; height: 28px; flex: 0 0 auto; place-items: center; border-radius: 999px; color: var(--label-secondary); }
 .sidebar-icon-button:hover, .sidebar-foot-action:hover { background: var(--bg-hover); }

@@ -15,7 +15,7 @@
 .empty-conversation { width: min(540px, 100%); margin: 0 auto; text-align: center; color: var(--label-secondary); }
 .empty-conversation h1, .empty-conversation h2 { margin: 10px 0 6px; color: var(--label-primary); }
 .empty-conversation p { margin: 4px 0; line-height: 1.6; }
-.empty-orb { display: grid; width: 42px; height: 42px; margin: 0 auto; place-items: center; border-radius: 12px; background: linear-gradient(145deg, var(--business-primary), #77a0ff); color: #fff; font-size: 18px; font-weight: 800; box-shadow: 0 16px 44px rgba(51, 109, 244, 0.2); }
+.empty-orb { width: 42px; height: 42px; margin: 0 auto; border-radius: 10px; box-shadow: 0 16px 44px rgba(15, 20, 32, 0.18); }
 .home-workspace { color: var(--label-caption); font-size: 13px; }
 .command-feedback { align-self: center; flex: 0 0 auto; margin: 8px 16px 0; border: 1px solid var(--border-subtle); border-radius: 999px; padding: 6px 10px; background: var(--bg-base); color: var(--label-secondary); box-shadow: var(--shadow-floating); font-size: 12px; }
 .details-region { display: flex; min-width: 0; min-height: 0; height: 100%; flex-direction: column; overflow: hidden; border-left: 1px solid var(--border-subtle); background: var(--bg-base); }

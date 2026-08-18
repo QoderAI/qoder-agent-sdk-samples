@@ -6,6 +6,7 @@ import type {
 } from "../../../shared/commands.js";
 import type { WorkspaceView } from "../../../shared/model.js";
 import { copy } from "../../i18n/zh-cn.js";
+import qoderIconUrl from "../../assets/qoder-icon-128.png";
 import { useAppState, useAppStore } from "../../store/store-context.js";
 import { findCommandFailure } from "../../store/command-ownership.js";
 import { ComposerDrafts } from "./composer-drafts.js";
@@ -201,7 +202,7 @@ export function ConversationRoot(props: {
     <div className="conversation-body conversation-root" data-phase={phase}>
       {phase === "hero" ? (
         <section className="conversation-phase empty-conversation home-hero">
-          <div className="empty-orb">Q</div>
+          <img className="empty-orb" src={qoderIconUrl} alt="" width={42} height={42} />
           <h1>{copy.home.title}</h1>
           <p>{copy.home.subtitle}</p>
           <p className="home-workspace">

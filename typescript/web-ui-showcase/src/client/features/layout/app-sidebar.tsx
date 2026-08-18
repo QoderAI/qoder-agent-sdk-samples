@@ -1,5 +1,6 @@
 import type { SessionView, WorkspaceView } from "../../../shared/model.js";
 import { copy } from "../../i18n/zh-cn.js";
+import qoderIconUrl from "../../assets/qoder-icon-64.png";
 import type { AcceptedCommand } from "../workspaces/workspace-panel.js";
 import { WorkspacePanel } from "../workspaces/workspace-panel.js";
 import type { SessionActionApi } from "../sessions/session-actions.js";
@@ -24,7 +25,7 @@ export function AppSidebar(props: {
   return (
     <aside className="workspace-region" aria-label={copy.workspace.navigation}>
       <header className="brand-block">
-        <span className="brand-mark">Q</span>
+        <img className="brand-mark" src={qoderIconUrl} alt="" width={30} height={30} />
         <div className="sidebar-wide"><strong>Qoder SDK 样板</strong><small>本地项目 Agent</small></div>
         <button className="sidebar-icon-button sidebar-toggle" type="button" aria-label={props.collapsed ? "展开 Session 侧栏" : "收起 Session 侧栏"} onClick={props.onToggle}>
           {props.collapsed ? "›" : "‹"}
