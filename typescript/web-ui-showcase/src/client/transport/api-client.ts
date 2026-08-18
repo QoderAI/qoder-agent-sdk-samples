@@ -161,6 +161,13 @@ export class ApiClient {
       directories,
     });
   }
+  pickAndAddDirectory(sessionId: string): Promise<Accepted> {
+    return this.#accepted(
+      `/api/sessions/${sessionId}/directories/pick`,
+      "POST",
+      {},
+    );
+  }
   backgroundTasks(sessionId: string, toolUseId?: string): Promise<Accepted> {
     return this.#accepted(
       `/api/sessions/${sessionId}/tasks/background`,
