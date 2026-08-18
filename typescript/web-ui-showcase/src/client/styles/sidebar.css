@@ -14,11 +14,12 @@
 .workspace-group { position: relative; border-top: 1px solid var(--border-subtle); padding-top: 8px; }
 .workspace-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; padding: 0 2px; cursor: pointer; list-style: none; }
 .workspace-heading::-webkit-details-marker { display: none; }
-.workspace-heading::before { content: "▾"; flex: 0 0 auto; margin-top: 2px; color: var(--label-secondary); font-size: 11px; line-height: 16px; }
+.workspace-heading::before { content: "▾"; flex: 0 0 auto; margin-top: 1px; color: var(--label-secondary); font-size: 13px; line-height: 16px; }
 .workspace-group:not([open]) > .workspace-heading::before { content: "▸"; }
 .workspace-heading div { display: grid; min-width: 0; flex: 1; gap: 1px; }
 .workspace-heading small { max-width: 190px; overflow: hidden; color: var(--label-secondary); text-overflow: ellipsis; white-space: nowrap; }
-.workspace-new-session { flex: 0 0 auto; color: var(--label-secondary); font-size: 16px; line-height: 1; }
+.workspace-new-session { flex: 0 0 auto; border-color: transparent; background: transparent; color: var(--label-secondary); font-size: 16px; line-height: 1; }
+.workspace-new-session:hover { background: transparent; color: var(--label-primary); }
 .session-row { position: relative; margin-top: 3px; }
 .session-item { display: grid; width: 100%; min-height: 38px; gap: 1px; border: 1px solid transparent; border-radius: 8px; padding: 6px 40px 6px 9px; overflow: hidden; background: transparent; text-align: left; cursor: pointer; }
 .session-item:hover { background: var(--bg-hover); }
