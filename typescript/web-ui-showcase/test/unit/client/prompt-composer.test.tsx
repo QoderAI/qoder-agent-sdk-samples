@@ -394,6 +394,181 @@ describe("PromptComposer", () => {
     expect(send).toHaveBeenCalledTimes(1);
   });
 
+  it("allows only one in-flight submission for the active target", async () => {
+    const user = userEvent.setup();
+    const gate = deferred<void>();
+    const send = vi.fn(() => gate.promise);
+    const drafts = new ComposerDrafts();
+    render(
+      <TargetPromptComposer
+        target={{
+          kind: "session",
+          session,
+          send,
+          stop: vi.fn(async () => undefined),
+          setModel: vi.fn(async () => ({ commandId: crypto.randomUUID() })),
+          setPermissionMode: vi.fn(async () => ({ commandId: crypto.randomUUID() })),
+          openMcp: vi.fn(),
+          refreshContext: vi.fn(async () => undefined),
+        }}
+        drafts={drafts}
+      />,
+    );
+    const textarea = screen.getByLabelText("消息");
+    const submit = screen.getByRole("button", { name: "发送" });
+    await user.type(textarea, "只发送一次");
+
+    fireEvent.click(submit);
+    fireEvent.click(submit);
+
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(textarea).toBeDisabled();
+    expect(submit).toBeDisabled();
+    await act(async () => gate.resolve(undefined));
+    await vi.waitFor(() => expect(textarea).toBeEnabled());
+    expect(drafts.read(session.id)).toBe("");
+  });
+
+  it("does not surface a previous Session submission failure in the active Session", async () => {
+    const user = userEvent.setup();
+    const gate = deferred<void>();
+    const drafts = new ComposerDrafts();
+    const otherSession = {
+      ...session,
+      id: "00000000-0000-4000-8000-000000000f05",
+    };
+    const target = (
+      selected: SessionView,
+      send: Extract<ComposerTarget, { kind: "session" }>["send"],
+    ): ComposerTarget => ({
+      kind: "session",
+      session: selected,
+      send,
+      stop: vi.fn(async () => undefined),
+      setModel: vi.fn(async () => ({ commandId: crypto.randomUUID() })),
+      setPermissionMode: vi.fn(async () => ({ commandId: crypto.randomUUID() })),
+      openMcp: vi.fn(),
+      refreshContext: vi.fn(async () => undefined),
+    });
+    const failingSend = vi.fn(async () => {
+      await gate.promise;
+      throw new Error("Previous Session failed");
+    });
+    const { rerender } = render(
+      <TargetPromptComposer
+        target={target(session, failingSend)}
+        drafts={drafts}
+      />,
+    );
+    await user.type(screen.getByLabelText("消息"), "旧 Session 请求");
+    fireEvent.click(screen.getByRole("button", { name: "发送" }));
+
+    rerender(
+      <TargetPromptComposer
+        target={target(otherSession, vi.fn(async () => undefined))}
+        drafts={drafts}
+      />,
+    );
+    await act(async () => gate.resolve(undefined));
+
+    await vi.waitFor(() => expect(failingSend).toHaveBeenCalledOnce());
+    expect(
+      screen.queryByText("命令请求未能提交，请重试。"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("clears an existing Composer error when the active Session changes", async () => {
+    const user = userEvent.setup();
+    const drafts = new ComposerDrafts();
+    const otherSession = {
+      ...session,
+      id: "00000000-0000-4000-8000-000000000f06",
+    };
+    const target = (
+      selected: SessionView,
+      send: Extract<ComposerTarget, { kind: "session" }>["send"],
+    ): ComposerTarget => ({
+      kind: "session",
+      session: selected,
+      send,
+      stop: vi.fn(async () => undefined),
+      setModel: vi.fn(async () => ({ commandId: crypto.randomUUID() })),
+      setPermissionMode: vi.fn(async () => ({ commandId: crypto.randomUUID() })),
+      openMcp: vi.fn(),
+      refreshContext: vi.fn(async () => undefined),
+    });
+    const { rerender } = render(
+      <TargetPromptComposer
+        target={target(
+          session,
+          vi.fn(async () => {
+            throw new Error("Current Session failed");
+          }),
+        )}
+        drafts={drafts}
+      />,
+    );
+    await user.type(screen.getByLabelText("消息"), "失败请求");
+    fireEvent.click(screen.getByRole("button", { name: "发送" }));
+    await screen.findByText("命令请求未能提交，请重试。");
+
+    rerender(
+      <TargetPromptComposer
+        target={target(otherSession, vi.fn(async () => undefined))}
+        drafts={drafts}
+      />,
+    );
+
+    expect(
+      screen.queryByText("命令请求未能提交，请重试。"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("does not carry pending runtime controls into another Session", async () => {
+    const user = userEvent.setup();
+    const drafts = new ComposerDrafts();
+    const otherSession = {
+      ...session,
+      id: "00000000-0000-4000-8000-000000000f04",
+    };
+    const runtime = (sessionId: string): SessionRuntimeView => ({
+      sessionId,
+      currentModel: "balanced",
+      currentPermissionMode: "default",
+      capabilities: [],
+      models: [
+        { value: "balanced", displayName: "Balanced" },
+        { value: "performance", displayName: "Performance" },
+      ],
+      hooks: [],
+      rawEvents: [],
+      errors: [],
+    });
+    const target = (selected: SessionView): ComposerTarget => ({
+      kind: "session",
+      session: selected,
+      runtime: runtime(selected.id),
+      send: vi.fn(async () => undefined),
+      stop: vi.fn(async () => undefined),
+      setModel: vi.fn(async () => ({ commandId: crypto.randomUUID() })),
+      setPermissionMode: vi.fn(async () => ({ commandId: crypto.randomUUID() })),
+      openMcp: vi.fn(),
+      refreshContext: vi.fn(async () => undefined),
+    });
+    const { rerender } = render(
+      <TargetPromptComposer target={target(session)} drafts={drafts} />,
+    );
+
+    await user.selectOptions(screen.getByLabelText("Model"), "performance");
+    expect(screen.getByLabelText("Model")).toBeDisabled();
+    rerender(
+      <TargetPromptComposer target={target(otherSession)} drafts={drafts} />,
+    );
+
+    expect(screen.getByLabelText("Model")).toBeEnabled();
+    expect(screen.getByLabelText("Permission Mode")).toBeEnabled();
+  });
+
   it("executes Model and Context commands without sending an Agent message", async () => {
     const user = userEvent.setup();
     const send = vi.fn(async () => ({ commandId: crypto.randomUUID() }));
@@ -526,7 +701,6 @@ describe("PromptComposer", () => {
   });
 
   it("does not expose browser scheduling controls", () => {
-    const user = userEvent.setup();
     const send = vi.fn(async () => ({ commandId: crypto.randomUUID() }));
     render(
       <PromptComposer

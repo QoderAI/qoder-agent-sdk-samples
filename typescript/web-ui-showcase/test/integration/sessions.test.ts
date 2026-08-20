@@ -100,24 +100,48 @@ class FakeCatalog implements SessionCatalog {
 class QueryOutput implements AsyncIterable<SDKMessage> {
   #resolve: ((result: IteratorResult<SDKMessage>) => void) | undefined;
   #reject: ((error: unknown) => void) | undefined;
+  readonly #queued: SDKMessage[] = [];
   [Symbol.asyncIterator](): AsyncIterator<SDKMessage> {
     return {
-      next: () =>
-        new Promise((resolve, reject) => {
-          this.#resolve = resolve;
-          this.#reject = reject;
-        }),
+      next: () => {
+        const queued = this.#queued.shift();
+        return queued === undefined
+          ? new Promise((resolve, reject) => {
+              this.#resolve = resolve;
+              this.#reject = reject;
+            })
+          : Promise.resolve({ done: false, value: queued });
+      },
     };
   }
   fail(error: Error): void {
-    this.#reject?.(error);
+    const reject = this.#reject;
+    this.#resolve = undefined;
+    this.#reject = undefined;
+    reject?.(error);
+  }
+  push(message: SDKMessage): void {
+    const resolve = this.#resolve;
+    if (resolve === undefined) {
+      this.#queued.push(message);
+      return;
+    }
+    this.#resolve = undefined;
+    this.#reject = undefined;
+    resolve({ done: false, value: message });
   }
   end(): void {
-    this.#resolve?.({ done: true, value: undefined });
+    const resolve = this.#resolve;
+    this.#resolve = undefined;
+    this.#reject = undefined;
+    resolve?.({ done: true, value: undefined });
   }
 }
 
-function fakeQueryFactory(options: { mcpConnected?: boolean } = {}): {
+function fakeQueryFactory(options: {
+  mcpConnected?: boolean;
+  initialMessages?: SDKMessage[];
+} = {}): {
   factory: QueryFactory;
   create: ReturnType<typeof vi.fn>;
   close: ReturnType<typeof vi.fn>;
@@ -128,6 +152,9 @@ function fakeQueryFactory(options: { mcpConnected?: boolean } = {}): {
   const create = vi.fn(() => {
     const output = new QueryOutput();
     outputs.push(output);
+    for (const message of options.initialMessages ?? []) {
+      output.push(message);
+    }
     return {
       [Symbol.asyncIterator]: () => output[Symbol.asyncIterator](),
       initializationResult: async () => ({
@@ -189,6 +216,7 @@ async function setup(options: {
   workspaceRepository?: WorkspaceRepository;
   directoryPicker?: { pick(): Promise<string | null> };
   mcpConnected?: boolean;
+  initialMessages?: SDKMessage[];
 } = {}) {
   const cwd = await realpath(
     await mkdtemp(join(tmpdir(), "qoder-session-api-")),
@@ -208,6 +236,9 @@ async function setup(options: {
     ...(options.mcpConnected === undefined
       ? {}
       : { mcpConnected: options.mcpConnected }),
+    ...(options.initialMessages === undefined
+      ? {}
+      : { initialMessages: options.initialMessages }),
   });
   const app = await createApp({
     assetRoot: null,
@@ -332,6 +363,18 @@ describe("Session commands", () => {
         shouldQuery: true,
       },
     });
+    const snapshot = await app.inject({
+      method: "GET",
+      url: `/api/snapshot?sessionId=${response.json().sessionId}`,
+    });
+    expect(snapshot.json().sessions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: response.json().sessionId,
+          phase: "running",
+        }),
+      ]),
+    );
   });
 
   it("starts a Session in a Workspace selected by the native picker", async () => {
@@ -543,6 +586,33 @@ describe("Session commands", () => {
     expect(queryFactory.close).toHaveBeenCalledOnce();
     expect(catalog.delete).toHaveBeenCalledWith(expect.any(String), sessionId);
     expect(order).toEqual(["close", "catalog.delete", "session.removed"]);
+  });
+
+  it("updates Session metadata from an SDK title event", async () => {
+    const { app } = await setup({
+      initialMessages: [{
+        type: "system",
+        subtype: "session_title_changed",
+        title: "Inspect the SDK sample",
+        source: "ai",
+        revision: 1,
+        uuid: "00000000-0000-4000-8000-00000000070a",
+        session_id: sessionId,
+      }],
+    });
+    const ensure = await app.inject({
+      method: "POST",
+      url: `/api/sessions/${sessionId}/ensure`,
+      payload: {},
+    });
+    expect(ensure.statusCode).toBe(202);
+    const snapshot = await app.inject({
+      method: "GET",
+      url: `/api/snapshot?sessionId=${sessionId}`,
+    });
+    expect(snapshot.json()).toMatchObject({
+      sessions: [{ id: sessionId, title: "Inspect the SDK sample" }],
+    });
   });
 
   it("closes and removes Workspace Sessions before removing the Workspace", async () => {

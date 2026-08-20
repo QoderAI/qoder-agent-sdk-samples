@@ -8,7 +8,6 @@ import { EventJournal } from "../../src/server/realtime/event-journal.js";
 import { InteractionBroker } from "../../src/server/sdk/interaction-broker.js";
 import { SessionRegistry } from "../../src/server/sdk/session-registry.js";
 import { createShutdown } from "../../src/server/shutdown.js";
-import type { EventEnvelope } from "../../src/shared/events.js";
 import { createFakeQueryFactory, FakeQuery } from "../fixtures/fake-query.js";
 import { FixtureSessionCatalog } from "../fixtures/fake-sdk-runtime.js";
 
@@ -22,17 +21,6 @@ afterEach(async () => {
   );
   vi.restoreAllMocks();
 });
-
-function waitForIdleSession(journal: EventJournal): Promise<string> {
-  return new Promise((resolve) => {
-    const unsubscribe = journal.subscribe((event: EventEnvelope) => {
-      if (event.type === "session.upserted" && event.payload.phase === "idle") {
-        unsubscribe();
-        resolve(event.payload.id);
-      }
-    });
-  });
-}
 
 describe("production shutdown", () => {
   it("closes every Query and pending interaction exactly once", async () => {
@@ -67,20 +55,17 @@ describe("production shutdown", () => {
       interactionBroker: interactions,
     });
 
-    const firstIdle = waitForIdleSession(journal);
-    await app.inject({
+    const firstResponse = await app.inject({
       method: "POST",
       url: "/api/sessions/start",
       payload: { workspaceId, text: "启动第一个关闭测试 Session" },
     });
-    const firstSessionId = await firstIdle;
-    const secondIdle = waitForIdleSession(journal);
+    const firstSessionId = firstResponse.json().sessionId as string;
     await app.inject({
       method: "POST",
       url: "/api/sessions/start",
       payload: { workspaceId, text: "启动第二个关闭测试 Session" },
     });
-    await secondIdle;
 
     const pending = interactions.canUseTool(() => firstSessionId)(
       "Write",

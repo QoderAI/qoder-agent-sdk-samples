@@ -5,11 +5,7 @@ import {
   workspaceIdSchema,
 } from "./ids.js";
 import { inputPrioritySchema, rewindScopeSchema } from "./model.js";
-import {
-  selectablePermissionModeSchema,
-  selectablePermissionModes,
-  type SelectablePermissionMode,
-} from "./permissions.js";
+import { selectablePermissionModeSchema } from "./permissions.js";
 
 export {
   selectablePermissionModeSchema,

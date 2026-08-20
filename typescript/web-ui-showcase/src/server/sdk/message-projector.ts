@@ -22,6 +22,7 @@ type ToolItem = Extract<ConversationItem, { kind: "tool" }>;
 type ToolUpdatePatch = Partial<
   Omit<ToolItem, "id" | "sessionId" | "kind" | "toolUseId" | "createdAt">
 >;
+type TaskPatch = Partial<Omit<TaskView, "sessionId" | "taskId">>;
 
 function sdkResultFallback(subtype: SDKResultError["subtype"]): string {
   switch (subtype) {
@@ -84,7 +85,10 @@ export type ProjectionAction =
       patch: ToolUpdatePatch;
     }
   | { type: "task.upsert"; task: TaskView }
+  | { type: "task.patch"; taskId: string; patch: TaskPatch }
+  | { type: "background-tasks.replace"; tasks: TaskView[] }
   | { type: "task.remove"; taskId: string }
+  | { type: "session.title-changed"; title: string }
   | { type: "runtime.patch"; patch: SessionRuntimePatch }
   | { type: "turn.completed"; success: boolean; error?: WireError };
 
@@ -125,6 +129,8 @@ function projectAssistant(
   const actions: ProjectionAction[] = [];
   const content = message.message.content;
   const hasTool = content.some((block) => block.type === "tool_use");
+  const hasMultipleTextBlocks =
+    content.filter((block) => block.type === "text").length > 1;
   for (const [blockIndex, block] of content.entries()) {
     if (
       block.type === "text" &&
@@ -133,7 +139,7 @@ function projectAssistant(
     ) {
       actions.push({
         type: "assistant.finalize",
-        sourceId: hasTool
+        sourceId: hasTool || hasMultipleTextBlocks
           ? `${message.uuid}:text:${blockIndex}`
           : message.uuid,
         text: block.text,
@@ -307,27 +313,32 @@ function projectSystem(
     case "task_updated":
       return [
         {
-          type: "task.upsert",
-          task: {
-            sessionId: context.sessionId,
-            taskId: message.task_id,
-            name: message.patch.description ?? "Task",
-            status: message.patch.status ?? "running",
-            foreground: message.patch.is_backgrounded !== true,
+          type: "task.patch",
+          taskId: message.task_id,
+          patch: {
+            ...(message.patch.description === undefined
+              ? {}
+              : { name: message.patch.description }),
+            ...(message.patch.status === undefined
+              ? {}
+              : { status: message.patch.status }),
+            ...(message.patch.is_backgrounded === undefined
+              ? {}
+              : { foreground: !message.patch.is_backgrounded }),
           },
         },
       ];
     case "background_tasks_changed":
-      return message.tasks.map((task) => ({
-        type: "task.upsert" as const,
-        task: {
+      return [{
+        type: "background-tasks.replace",
+        tasks: message.tasks.map((task) => ({
           sessionId: context.sessionId,
           taskId: task.task_id,
           name: task.description,
           status: "running",
           foreground: false,
-        },
-      }));
+        })),
+      }];
     case "hook_started":
     case "hook_progress":
     case "hook_response":
@@ -402,10 +413,11 @@ function projectSystem(
       ];
     case "status":
     case "session_state_changed":
-    case "session_title_changed":
     case "files_persisted":
     case "elicitation_complete":
       return [];
+    case "session_title_changed":
+      return [{ type: "session.title-changed", title: message.title }];
     default:
       return [];
   }

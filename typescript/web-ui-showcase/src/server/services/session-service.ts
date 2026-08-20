@@ -390,6 +390,7 @@ export class SessionService {
       });
     }
     const input = new InputQueue();
+    let latestTitle: string | undefined;
     const getSessionId = () => view.id;
     const query = this.#queryFactory.create({
       workspacePath: view.cwd,
@@ -412,6 +413,17 @@ export class SessionService {
       mcp: this.#mcp,
       runtimeState: this.#runtimeState,
       includeRawEvents: this.#includeRawEvents,
+      initialTasks: this.#snapshots.tasks(view.id),
+      onSessionTitleChanged: (title) => {
+        latestTitle = title;
+        const current = this.#snapshots.session(view.id);
+        if (current === undefined) return;
+        this.#publishSession({
+          ...current,
+          title,
+          updatedAt: this.#now(),
+        });
+      },
     });
     const release = this.#registry.reserve(view.id, controller);
     controller.attachRegistryRelease(release);
@@ -420,10 +432,13 @@ export class SessionService {
       if (initialMessage !== undefined) {
         this.#enqueueMessage(controller, view.id, initialMessage);
       }
+      const current = this.#snapshots.session(view.id) ?? view;
+      const controllerLifecycle = controller.lifecycle();
       this.#publishSession({
-        ...view,
-        phase: "idle",
-        awaitingUser: false,
+        ...current,
+        ...(latestTitle === undefined ? {} : { title: latestTitle }),
+        phase: controllerLifecycle.phase,
+        awaitingUser: controllerLifecycle.awaitingUser,
         capabilities: initialized.capabilities,
         updatedAt: this.#now(),
       });

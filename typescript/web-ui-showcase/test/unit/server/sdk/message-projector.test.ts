@@ -129,6 +129,38 @@ describe("SDK message projection", () => {
     ]);
   });
 
+  it("keeps adjacent Assistant text blocks as distinct semantic segments", () => {
+    const message = {
+      type: "assistant",
+      message: {
+        role: "assistant",
+        content: [
+          { type: "text", text: "第一段。" },
+          { type: "text", text: "第二段。" },
+        ],
+      },
+      parent_tool_use_id: null,
+      uuid: itemId,
+      session_id: sessionId,
+    } satisfies SDKMessage;
+
+    expect(projectSdkMessage(message, {
+      ...context,
+      includeRawEvents: false,
+    })).toEqual([
+      {
+        type: "assistant.finalize",
+        sourceId: `${itemId}:text:0`,
+        text: "第一段。",
+      },
+      {
+        type: "assistant.finalize",
+        sourceId: `${itemId}:text:1`,
+        text: "第二段。",
+      },
+    ]);
+  });
+
   it("suppresses Raw Events without suppressing semantic projection", () => {
     const assistant = {
       type: "assistant",
@@ -303,6 +335,85 @@ describe("SDK message projection", () => {
           toolUseId: "tool-1",
         },
       },
+    ]);
+  });
+
+  it("projects Task patches without inventing unchanged fields", () => {
+    const message = {
+      type: "system",
+      subtype: "task_updated",
+      task_id: "task-1",
+      patch: {
+        status: "paused",
+        is_backgrounded: true,
+      },
+      uuid: itemId,
+      session_id: sessionId,
+    } satisfies SDKMessage;
+
+    expect(projectSdkMessage(message, {
+      ...context,
+      includeRawEvents: false,
+    })).toEqual([
+      {
+        type: "task.patch",
+        taskId: "task-1",
+        patch: { status: "paused", foreground: false },
+      },
+    ]);
+  });
+
+  it("projects the complete background Task replacement, including empty sets", () => {
+    const changed = {
+      type: "system",
+      subtype: "background_tasks_changed",
+      tasks: [{
+        task_id: "task-background",
+        task_type: "agent",
+        description: "Inspect dependencies",
+      }],
+      uuid: itemId,
+      session_id: sessionId,
+    } satisfies SDKMessage;
+    const empty = { ...changed, tasks: [] } satisfies SDKMessage;
+
+    expect(projectSdkMessage(changed, {
+      ...context,
+      includeRawEvents: false,
+    })).toEqual([
+      {
+        type: "background-tasks.replace",
+        tasks: [{
+          sessionId,
+          taskId: "task-background",
+          name: "Inspect dependencies",
+          status: "running",
+          foreground: false,
+        }],
+      },
+    ]);
+    expect(projectSdkMessage(empty, {
+      ...context,
+      includeRawEvents: false,
+    })).toEqual([{ type: "background-tasks.replace", tasks: [] }]);
+  });
+
+  it("projects SDK Session title changes", () => {
+    const message = {
+      type: "system",
+      subtype: "session_title_changed",
+      title: "Inspect the repository",
+      source: "ai",
+      revision: 1,
+      uuid: itemId,
+      session_id: sessionId,
+    } satisfies SDKMessage;
+
+    expect(projectSdkMessage(message, {
+      ...context,
+      includeRawEvents: false,
+    })).toEqual([
+      { type: "session.title-changed", title: "Inspect the repository" },
     ]);
   });
 

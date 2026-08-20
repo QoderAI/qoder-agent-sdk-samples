@@ -433,7 +433,7 @@ test("uses accessible sidebar and SDK Console overlays at 390 by 844", async ({
   await projectDrawer.getByRole("button", { name: "关闭 项目" }).click();
   await expect(projectDrawer).toHaveCount(0);
 
-  const composer = await startSessionFromHero(page, "移动端检查");
+  await startSessionFromHero(page, "移动端检查");
   await completeFixtureTurn(page);
   await page.getByRole("button", { name: "项目", exact: true }).click();
   const sessionRow = page.locator(".project-drawer-content .session-row").first();

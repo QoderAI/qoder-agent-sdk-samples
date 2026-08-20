@@ -4,7 +4,6 @@ import { cleanup, fireEvent, render, screen, within } from "@testing-library/rea
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { SettingsDialog, type SettingsApi } from "../../../src/client/features/runtime/settings-dialog.js";
-import { Drawer } from "../../../src/client/features/layout/drawer.js";
 import { AppStore } from "../../../src/client/store/app-store.js";
 import { StoreProvider } from "../../../src/client/store/store-context.js";
 

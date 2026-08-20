@@ -113,12 +113,17 @@ export function PromptComposer(props: PromptComposerProps): JSX.Element {
   const permissionControl = useRef<HTMLSelectElement>(null);
   const restoreCaret = useRef(false);
   const requestSequence = useRef(0);
+  const activeDraftKey = useRef(draftKey);
+  const submittingDrafts = useRef(new Set<string>());
+  const [, setSubmissionRevision] = useState(0);
+  activeDraftKey.current = draftKey;
   const enabled =
     !props.autoResuming &&
     props.disabledReason === undefined &&
     (session === undefined ||
       session.phase === "idle" ||
       session.phase === "running");
+  const submitting = submittingDrafts.current.has(draftKey);
   const activeQuery = parseSuggestionQuery(draft, cursor);
   const queryKey = suggestionQueryKey(activeQuery);
   const composerCommands = runtime?.composerCommands ?? [];
@@ -167,6 +172,7 @@ export function PromptComposer(props: PromptComposerProps): JSX.Element {
 
   useEffect(() => {
     requestSequence.current += 1;
+    setError(null);
     setCursor(drafts.read(draftKey).length);
     setFileState({ status: "idle", items: [], truncated: false });
     setDismissedQueryKey(null);
@@ -227,9 +233,17 @@ export function PromptComposer(props: PromptComposerProps): JSX.Element {
 
   function clearDraft(key = draftKey): void {
     drafts.clear(key);
+    if (key !== activeDraftKey.current) return;
     setDraftRevision((revision) => revision + 1);
     setCursor(0);
     setDismissedQueryKey(null);
+  }
+
+  function setDraftError(
+    key: string,
+    message: string | null,
+  ): void {
+    if (key === activeDraftKey.current) setError(message);
   }
 
   function checkRuntimeControl(control: RuntimeControl): boolean {
@@ -259,12 +273,18 @@ export function PromptComposer(props: PromptComposerProps): JSX.Element {
 
   async function submitDraft(): Promise<void> {
     const text = draft.trim();
-    if (!enabled || text.length === 0) return;
+    if (
+      !enabled ||
+      text.length === 0 ||
+      submittingDrafts.current.has(draftKey)
+    ) return;
     const submittedKey = draftKey;
+    submittingDrafts.current.add(submittedKey);
+    setSubmissionRevision((revision) => revision + 1);
     try {
       if (target.kind === "home") {
         await target.start(text);
-        setError(null);
+        setDraftError(submittedKey, null);
         clearDraft(submittedKey);
         return;
       }
@@ -273,7 +293,7 @@ export function PromptComposer(props: PromptComposerProps): JSX.Element {
         switch (completed.command.execution) {
           case "sdk-input":
             await target.send(text);
-            setError(null);
+            setDraftError(submittedKey, null);
             clearDraft(submittedKey);
             return;
           case "model-control":
@@ -291,17 +311,20 @@ export function PromptComposer(props: PromptComposerProps): JSX.Element {
               return;
             }
             await target.refreshContext();
-            setError(null);
+            setDraftError(submittedKey, null);
             clearDraft(submittedKey);
             return;
           }
         }
       }
       await target.send(text);
-      setError(null);
+      setDraftError(submittedKey, null);
       clearDraft(submittedKey);
     } catch {
-      setError("命令请求未能提交，请重试。");
+      setDraftError(submittedKey, "命令请求未能提交，请重试。");
+    } finally {
+      submittingDrafts.current.delete(submittedKey);
+      setSubmissionRevision((revision) => revision + 1);
     }
   }
 
@@ -399,7 +422,7 @@ export function PromptComposer(props: PromptComposerProps): JSX.Element {
                 type="button"
                 onClick={() =>
                   void props.cancel?.(item.uuid).catch(() =>
-                    setError(copy.composer.alreadyProcessing),
+                    setDraftError(draftKey, copy.composer.alreadyProcessing),
                   )
                 }
               >
@@ -503,11 +526,12 @@ export function PromptComposer(props: PromptComposerProps): JSX.Element {
                   ? copy.composer.placeholder
                   : copy.composer.resumePlaceholder)
           }
-          disabled={!enabled}
+          disabled={!enabled || submitting}
         />
         <footer>
           {target.kind === "session" ? (
             <ComposerControlMenu
+              key={target.session.id}
               context={contextSummary}
               {...(runtime === undefined ? {} : { runtime })}
               modelRef={modelControl}
@@ -529,7 +553,10 @@ export function PromptComposer(props: PromptComposerProps): JSX.Element {
               onClick={() => {
                 if (target.kind === "session") {
                   void target.stop().catch(() =>
-                    setError("命令请求未能提交，请重试。"),
+                    setDraftError(
+                      draftKey,
+                      "命令请求未能提交，请重试。",
+                    ),
                   );
                 }
               }}
@@ -541,7 +568,7 @@ export function PromptComposer(props: PromptComposerProps): JSX.Element {
             className="button primary"
             type="submit"
             aria-keyshortcuts="Enter"
-            disabled={!enabled || draft.trim().length === 0}
+            disabled={!enabled || submitting || draft.trim().length === 0}
           >
             {copy.composer.send}
           </button>

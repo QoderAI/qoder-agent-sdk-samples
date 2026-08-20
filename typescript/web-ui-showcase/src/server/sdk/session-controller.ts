@@ -1,6 +1,10 @@
 import { randomUUID } from "node:crypto";
 import type { WireError } from "../../shared/errors.js";
-import type { ConversationItem, QueuedInputView } from "../../shared/model.js";
+import type {
+  ConversationItem,
+  QueuedInputView,
+  TaskView,
+} from "../../shared/model.js";
 import type { SelectablePermissionMode } from "../../shared/permissions.js";
 import { AppError, toWireError } from "../errors/app-error.js";
 import type { EventJournal } from "../realtime/event-journal.js";
@@ -53,7 +57,9 @@ export class SessionController {
   readonly #initialModel: string | null;
   readonly #initialPermissionMode: SelectablePermissionMode;
   readonly #includeRawEvents: boolean;
+  readonly #onSessionTitleChanged: (title: string) => void;
   readonly #messages = new Map<string, ConversationItem>();
+  readonly #tasks = new Map<string, TaskView>();
   readonly #runtimeState: SessionRuntimeState;
   #lifecycle: SessionLifecycle = {
     phase: "restorable",
@@ -84,6 +90,8 @@ export class SessionController {
     initialModel: string | null;
     initialPermissionMode: SelectablePermissionMode;
     includeRawEvents?: boolean;
+    onSessionTitleChanged?: (title: string) => void;
+    initialTasks?: TaskView[];
   }) {
     this.#sessionId = options.sessionId;
     this.#query = options.query;
@@ -96,6 +104,11 @@ export class SessionController {
     this.#initialModel = options.initialModel;
     this.#initialPermissionMode = options.initialPermissionMode;
     this.#includeRawEvents = options.includeRawEvents ?? true;
+    this.#onSessionTitleChanged =
+      options.onSessionTitleChanged ?? (() => undefined);
+    for (const task of options.initialTasks ?? []) {
+      this.#tasks.set(task.taskId, task);
+    }
     this.#runtimeState =
       options.runtimeState ?? new SessionRuntimeState({ journal: options.journal });
   }
@@ -365,9 +378,11 @@ export class SessionController {
       }
     }
     if (options.fromPump) {
+      this.#clearTasks();
       this.#releaseRegistry();
     } else {
       await this.#pumpPromise;
+      this.#clearTasks();
       this.#setLifecycle({ phase: "restorable", awaitingUser: false });
       this.#releaseRegistry();
     }
@@ -543,19 +558,37 @@ export class SessionController {
         return;
       }
       case "task.upsert":
-        this.#journal.publish(
-          { type: "task.upserted", payload: action.task },
-          { sessionId: this.#sessionId },
-        );
+        this.#tasks.set(action.task.taskId, action.task);
+        this.#publishTask(action.task);
         return;
+      case "task.patch": {
+        const current = this.#tasks.get(action.taskId);
+        if (current === undefined) return;
+        const task = { ...current, ...action.patch };
+        this.#tasks.set(task.taskId, task);
+        this.#publishTask(task);
+        return;
+      }
+      case "background-tasks.replace": {
+        const nextIds = new Set(action.tasks.map((task) => task.taskId));
+        for (const task of this.#tasks.values()) {
+          if (!task.foreground && !nextIds.has(task.taskId)) {
+            this.#tasks.delete(task.taskId);
+            this.#publishTaskRemoval(task.taskId);
+          }
+        }
+        for (const task of action.tasks) {
+          this.#tasks.set(task.taskId, task);
+          this.#publishTask(task);
+        }
+        return;
+      }
       case "task.remove":
-        this.#journal.publish(
-          {
-            type: "task.removed",
-            payload: { sessionId: this.#sessionId, taskId: action.taskId },
-          },
-          { sessionId: this.#sessionId },
-        );
+        this.#tasks.delete(action.taskId);
+        this.#publishTaskRemoval(action.taskId);
+        return;
+      case "session.title-changed":
+        this.#onSessionTitleChanged(action.title);
         return;
       case "runtime.patch":
         this.#runtimeState.merge(this.#sessionId, action.patch);
@@ -583,6 +616,30 @@ export class SessionController {
       },
       { sessionId: this.#sessionId },
     );
+  }
+
+  #publishTask(task: TaskView): void {
+    this.#journal.publish(
+      { type: "task.upserted", payload: task },
+      { sessionId: this.#sessionId },
+    );
+  }
+
+  #publishTaskRemoval(taskId: string): void {
+    this.#journal.publish(
+      {
+        type: "task.removed",
+        payload: { sessionId: this.#sessionId, taskId },
+      },
+      { sessionId: this.#sessionId },
+    );
+  }
+
+  #clearTasks(): void {
+    for (const taskId of this.#tasks.keys()) {
+      this.#publishTaskRemoval(taskId);
+    }
+    this.#tasks.clear();
   }
 
   #finishActiveAssistant(

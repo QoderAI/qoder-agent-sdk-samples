@@ -3,10 +3,7 @@ import type {
   CheckpointExecuteCommand,
   CheckpointPreviewCommand,
 } from "../../shared/commands.js";
-import type {
-  CheckpointPreviewView,
-  RewindScopeView,
-} from "../../shared/model.js";
+import type { CheckpointPreviewView } from "../../shared/model.js";
 import { AppError } from "../errors/app-error.js";
 import type { EventJournal } from "../realtime/event-journal.js";
 import type { SessionCatalog } from "../services/session-catalog-port.js";

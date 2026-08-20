@@ -120,6 +120,9 @@ export class InputQueue implements AsyncIterable<SDKUserMessage> {
     }
     this.#closed = true;
     this.#closeError = error;
+    for (const item of this.#items.splice(0)) {
+      this.#notify({ uuid: item.uuid, removed: true });
+    }
     const waiter = this.#waiter;
     this.#waiter = undefined;
     if (waiter === undefined) {

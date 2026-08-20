@@ -74,6 +74,29 @@ describe("InputQueue", () => {
     ).toThrow(expect.objectContaining({ code: "SESSION_CLOSED" }));
   });
 
+  it("removes every visible input before closing", async () => {
+    const secondUuid = "00000000-0000-4000-8000-000000000202";
+    const ids = [firstUuid, secondUuid];
+    const onStateChange = vi.fn();
+    const queue = new InputQueue({
+      createUuid: () => ids.shift() ?? crypto.randomUUID(),
+      onStateChange,
+    });
+    queue.enqueue({ text: "Delivered", priority: "now", shouldQuery: true });
+    await queue[Symbol.asyncIterator]().next();
+    queue.enqueue({ text: "Buffered", priority: "later", shouldQuery: false });
+
+    queue.close();
+
+    expect(queue.list()).toEqual([]);
+    expect(onStateChange.mock.calls.map(([change]) => change)).toEqual(
+      expect.arrayContaining([
+        { uuid: firstUuid, removed: true },
+        { uuid: secondUuid, removed: true },
+      ]),
+    );
+  });
+
   it("rejects concurrent iterator waiters", async () => {
     const queue = new InputQueue({ createUuid: () => firstUuid });
     const iterator = queue[Symbol.asyncIterator]();

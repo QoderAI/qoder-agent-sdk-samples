@@ -141,6 +141,12 @@ export class SnapshotService {
     return this.#sessions.get(sessionId);
   }
 
+  tasks(sessionId: string): TaskView[] {
+    return [...this.#tasks.values()].filter(
+      (task) => task.sessionId === sessionId,
+    );
+  }
+
   close(): void {
     this.#unsubscribe();
   }

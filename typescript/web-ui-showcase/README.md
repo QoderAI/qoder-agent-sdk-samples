@@ -4,6 +4,8 @@ This sample is a complete local Web UI application built with the Qoder TypeScri
 
 The browser uses a Chinese, light-theme product shell. Established SDK concepts such as Session, Workspace, Model, Permission, MCP, Hooks, Task, Checkpoint, Credits, Skill, Command, and Tool retain their English names. Model and Permission Mode are compact Composer selectors backed by a single-page Settings dialog that also adds allowed directories through the native folder picker, MCP lives in the SDK console (`/mcp` opens its tab) alongside Hooks, Raw Events, Skills, Agents, Plugins, and Account, and Tool input/result expands beneath its transcript row.
 
+For a product-oriented Chinese trial script that maps UI behavior to SDK APIs and provides copyable prompts with pass criteria, see [the product trial guide](PRODUCT_TRIAL_GUIDE.zh-CN.md).
+
 ## Run the sample
 
 Requirements:

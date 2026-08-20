@@ -9,7 +9,10 @@ import type { QueryPort } from "../../../../src/server/sdk/query-port.js";
 import { SessionRuntimeState } from "../../../../src/server/sdk/session-runtime-state.js";
 import { createShowcaseHooks } from "../../../../src/server/sdk/hooks.js";
 import { EventJournal } from "../../../../src/server/realtime/event-journal.js";
-import type { ConversationItem } from "../../../../src/shared/model.js";
+import type {
+  ConversationItem,
+  TaskView,
+} from "../../../../src/shared/model.js";
 
 const sessionId = "00000000-0000-4000-8000-000000000601";
 
@@ -111,6 +114,8 @@ function createHarness(
     closeQuery?: (output: OutputChannel) => Promise<void>;
     now?: () => string;
     createId?: () => string;
+    onSessionTitleChanged?: (title: string) => void;
+    initialTasks?: TaskView[];
   } = {},
 ) {
   const output = new OutputChannel();
@@ -169,6 +174,9 @@ function createHarness(
       `00000000-0000-4000-8000-${String(nextInputId++).padStart(12, "0")}`,
   });
   const runtimeState = new SessionRuntimeState({ journal });
+  const onSessionTitleChanged = vi.fn(
+    options.onSessionTitleChanged ?? (() => undefined),
+  );
   const controller = new SessionController({
     initialModel: "fixture-model",
     initialPermissionMode: "default",
@@ -182,6 +190,10 @@ function createHarness(
     createId:
       options.createId ??
       (() => `00000000-0000-4000-8000-${String(nextInputId++).padStart(12, "0")}`),
+    onSessionTitleChanged,
+    ...(options.initialTasks === undefined
+      ? {}
+      : { initialTasks: options.initialTasks }),
   });
   return {
     controller,
@@ -195,6 +207,7 @@ function createHarness(
     interrupt,
     cancelAsyncMessage,
     getContextUsage,
+    onSessionTitleChanged,
   };
 }
 
@@ -219,7 +232,142 @@ function conversationItems(journal: EventJournal): ConversationItem[] {
   );
 }
 
+function taskEvents(journal: EventJournal): Array<
+  | { type: "task.upserted"; task: TaskView }
+  | { type: "task.removed"; taskId: string }
+> {
+  const replay = journal.replay({ epoch: "epoch-a", after: 0 });
+  if (replay.kind !== "events") return [];
+  const tasks: Array<
+    | { type: "task.upserted"; task: TaskView }
+    | { type: "task.removed"; taskId: string }
+  > = [];
+  for (const event of replay.events) {
+    if (event.type === "task.upserted") {
+      tasks.push({ type: event.type, task: event.payload });
+    }
+    if (event.type === "task.removed") {
+      tasks.push({ type: event.type, taskId: event.payload.taskId });
+    }
+  }
+  return tasks;
+}
+
 describe("SessionController", () => {
+  it("merges Task patches and applies complete background replacements", async () => {
+    const staleBackgroundTask: TaskView = {
+      sessionId,
+      taskId: "task-stale",
+      name: "Stale background task",
+      status: "running",
+      foreground: false,
+    };
+    const harness = createHarness({ initialTasks: [staleBackgroundTask] });
+    await harness.controller.start();
+    harness.output.push({
+      type: "system",
+      subtype: "task_started",
+      task_id: "task-1",
+      tool_use_id: "tool-1",
+      description: "Inspect project",
+      uuid: "00000000-0000-4000-8000-0000000006a1",
+      session_id: sessionId,
+    } satisfies SDKMessage);
+    harness.output.push({
+      type: "system",
+      subtype: "task_updated",
+      task_id: "task-1",
+      patch: { status: "paused" },
+      uuid: "00000000-0000-4000-8000-0000000006a2",
+      session_id: sessionId,
+    } satisfies SDKMessage);
+
+    await waitFor(
+      () => taskEvents(harness.journal).filter(
+        (event) => event.type === "task.upserted",
+      ).length === 2,
+      "Task patch was not projected",
+    );
+    expect(taskEvents(harness.journal).at(-1)).toEqual({
+      type: "task.upserted",
+      task: {
+        sessionId,
+        taskId: "task-1",
+        name: "Inspect project",
+        status: "paused",
+        foreground: true,
+        toolUseId: "tool-1",
+      },
+    });
+
+    harness.output.push({
+      type: "system",
+      subtype: "background_tasks_changed",
+      tasks: [{
+        task_id: "task-background",
+        task_type: "agent",
+        description: "Review dependencies",
+      }],
+      uuid: "00000000-0000-4000-8000-0000000006a3",
+      session_id: sessionId,
+    } satisfies SDKMessage);
+    await waitFor(
+      () => taskEvents(harness.journal).some(
+        (event) =>
+          event.type === "task.upserted" &&
+          event.task.taskId === "task-background",
+      ),
+      "Background Task replacement was not projected",
+    );
+    expect(taskEvents(harness.journal)).toContainEqual({
+      type: "task.removed",
+      taskId: staleBackgroundTask.taskId,
+    });
+    harness.output.push({
+      type: "system",
+      subtype: "background_tasks_changed",
+      tasks: [],
+      uuid: "00000000-0000-4000-8000-0000000006a4",
+      session_id: sessionId,
+    } satisfies SDKMessage);
+    await waitFor(
+      () => taskEvents(harness.journal).some(
+        (event) =>
+          event.type === "task.removed" &&
+          event.taskId === "task-background",
+      ),
+      "Empty background Task replacement did not remove stale Tasks",
+    );
+    await harness.controller.close("test complete");
+    expect(taskEvents(harness.journal)).toContainEqual({
+      type: "task.removed",
+      taskId: "task-1",
+    });
+  });
+
+  it("forwards SDK Session title changes to the owning service", async () => {
+    const harness = createHarness();
+    await harness.controller.start();
+    harness.output.push({
+      type: "system",
+      subtype: "session_title_changed",
+      title: "Inspect the repository",
+      source: "ai",
+      revision: 1,
+      uuid: "00000000-0000-4000-8000-0000000006a5",
+      session_id: sessionId,
+    } satisfies SDKMessage);
+
+    await waitFor(
+      () => harness.onSessionTitleChanged.mock.calls.length === 1,
+      "Session title change was not forwarded",
+    );
+    expect(harness.onSessionTitleChanged).toHaveBeenCalledWith(
+      "Inspect the repository",
+    );
+    await harness.controller.close("test complete");
+  });
+
   it("projects initialization commands and Skills into Session runtime", async () => {
     const harness = createHarness();
 
