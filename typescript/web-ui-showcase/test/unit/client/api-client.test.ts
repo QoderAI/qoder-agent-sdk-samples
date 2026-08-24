@@ -75,12 +75,14 @@ describe("ApiClient fetch invocation", () => {
     await expect(startSession.call(client, { text: "检查这个项目" })).rejects.toThrow();
   });
 
-  it("reads project file suggestions with an encoded query", async () => {
+  it("reads project file suggestions with an encoded query and AbortSignal", async () => {
     let requested: string | URL | Request | undefined;
+    let init: RequestInit | undefined;
     const client = new ApiClient({
       baseUrl: "http://127.0.0.1:8787",
-      fetch: (async (input) => {
+      fetch: (async (input, options) => {
         requested = input;
+        init = options;
         return new Response(
           JSON.stringify({
             items: [{
@@ -100,6 +102,7 @@ describe("ApiClient fetch invocation", () => {
         searchWorkspaceFiles?: (
           sessionId: string,
           query: string,
+          signal?: AbortSignal,
         ) => Promise<{
           items: Array<{
             path: string;
@@ -114,11 +117,13 @@ describe("ApiClient fetch invocation", () => {
 
     expect(typeof searchWorkspaceFiles).toBe("function");
     if (searchWorkspaceFiles === undefined) return;
+    const controller = new AbortController();
     await expect(
       searchWorkspaceFiles.call(
         client,
         "00000000-0000-4000-8000-000000000e02",
         "my guide",
+        controller.signal,
       ),
     ).resolves.toEqual({
       items: [{
@@ -132,6 +137,52 @@ describe("ApiClient fetch invocation", () => {
     expect(String(requested)).toBe(
       "http://127.0.0.1:8787/api/sessions/00000000-0000-4000-8000-000000000e02/files?q=my+guide",
     );
+    expect(init?.signal).toBe(controller.signal);
+  });
+
+  it("submits typed Checkpoint preview and execution commands", async () => {
+    const requests: Array<{ url: string; init?: RequestInit }> = [];
+    const commandId = "00000000-0000-4000-8000-000000000e01";
+    const sessionId = "00000000-0000-4000-8000-000000000e02";
+    const userMessageId = "00000000-0000-4000-8000-000000000e03";
+    const previewId = "00000000-0000-4000-8000-000000000e04";
+    const client = new ApiClient({
+      baseUrl: "http://127.0.0.1:8787",
+      fetch: (async (input, init) => {
+        requests.push({ url: String(input), ...(init === undefined ? {} : { init }) });
+        return new Response(JSON.stringify({ commandId }), {
+          status: 202,
+          headers: { "content-type": "application/json" },
+        });
+      }) as typeof fetch,
+    });
+
+    await expect(client.previewCheckpoint(sessionId, {
+      userMessageId,
+      scope: "files",
+    })).resolves.toEqual({ commandId });
+    await expect(client.executeCheckpoint(sessionId, {
+      previewId,
+      userMessageId,
+      scope: "files",
+    })).resolves.toEqual({ commandId });
+
+    expect(requests).toEqual([
+      {
+        url: `http://127.0.0.1:8787/api/sessions/${sessionId}/checkpoints/preview`,
+        init: expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ userMessageId, scope: "files" }),
+        }),
+      },
+      {
+        url: `http://127.0.0.1:8787/api/sessions/${sessionId}/checkpoints/execute`,
+        init: expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ previewId, userMessageId, scope: "files" }),
+        }),
+      },
+    ]);
   });
 
   it("does not bind the ApiClient instance as the fetch receiver", async () => {

@@ -176,8 +176,6 @@ export class FakeQuery implements QueryPort {
 
   async setModel(): Promise<void> {}
 
-  async setProxy(): Promise<void> {}
-
   addDirectories(
     directories: string[],
   ): ReturnType<QueryPort["addDirectories"]> {
@@ -304,16 +302,6 @@ export class FakeQuery implements QueryPort {
     });
   }
 
-  listByokProviders(): ReturnType<QueryPort["listByokProviders"]> {
-    return Promise.resolve(null);
-  }
-
-  async validateByokModel(): Promise<boolean | null> {
-    return true;
-  }
-
-  async applyFlagSettings(): Promise<void> {}
-
   generateSessionTitle(): ReturnType<QueryPort["generateSessionTitle"]> {
     return Promise.resolve("Fixture generated title");
   }
@@ -334,18 +322,20 @@ export class FakeQuery implements QueryPort {
     userMessageId: string,
     options?: Parameters<QueryPort["rewind"]>[1],
   ): ReturnType<QueryPort["rewind"]> {
+    const scope = options?.scope ?? "both";
+    if (options?.dryRun !== true && scope !== "files") {
+      this.#catalog.rewindConversation(this.#sessionId, userMessageId);
+    }
     return Promise.resolve({
       status: options?.dryRun === true ? "ready" : "success",
       targetUserMessageId: userMessageId,
-      scope: options?.scope ?? "both",
+      scope,
       filesChanged: ["README.md"],
       insertions: 4,
       deletions: 1,
       failedFiles: [],
     }) as ReturnType<QueryPort["rewind"]>;
   }
-
-  async seedReadState(): Promise<void> {}
 
   async close(): Promise<void> {
     if (this.#closed) return;

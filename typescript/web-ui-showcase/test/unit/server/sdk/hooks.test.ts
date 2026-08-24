@@ -50,8 +50,14 @@ describe("showcase Hooks", () => {
     expect(onToolRunning).toHaveBeenCalledOnce();
     expect(onToolRunning).toHaveBeenCalledWith("tool-1");
     expect(runtimeState.snapshot(sessionId).hooks).toMatchObject([
-      { event: "SessionStart" },
       {
+        source: "callback",
+        phase: "observation",
+        event: "SessionStart",
+      },
+      {
+        source: "callback",
+        phase: "observation",
         event: "PreToolUse",
         toolName: "Bash",
         input: { command: "pwd", access_token: "[REDACTED]" },

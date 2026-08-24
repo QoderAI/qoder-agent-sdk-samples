@@ -10,6 +10,8 @@ const workspaceId = "00000000-0000-4000-8000-000000000b01";
 const sessionId = "00000000-0000-4000-8000-000000000b02";
 const interactionId = "00000000-0000-4000-8000-000000000b03";
 const commandId = "00000000-0000-4000-8000-000000000b04";
+const checkpointPreviewId = "00000000-0000-4000-8000-000000000b07";
+const otherCheckpointPreviewId = "00000000-0000-4000-8000-000000000b09";
 const otherSessionId = "00000000-0000-4000-8000-000000000b08";
 
 function snapshot(): AppSnapshot {
@@ -165,6 +167,106 @@ describe("application reducer", () => {
     });
     expect(gap.needsSnapshot).toBe(true);
     expect(gap.state).toBe(reduced.state);
+  });
+
+  it("projects Checkpoint snapshots, removals, completions, and conversation replacement", () => {
+    const preview = {
+      id: checkpointPreviewId,
+      sessionId,
+      userMessageId: "00000000-0000-4000-8000-000000000b05",
+      scope: "files" as const,
+      expiresAt: "2026-08-14T08:06:00.000Z",
+      canRewind: true,
+      status: "ready" as const,
+      filesChanged: ["src/app.ts"],
+      insertions: 4,
+      deletions: 2,
+      failedFiles: [],
+    };
+    const initialSnapshot = snapshot();
+    initialSnapshot.checkpointPreviews = [preview];
+    const hydrated = reduceServerFrame(createInitialState(), {
+      kind: "snapshot",
+      snapshot: initialSnapshot,
+    }).state;
+
+    expect(hydrated.checkpointPreviewIds).toEqual([checkpointPreviewId]);
+    expect(hydrated.checkpointPreviews[checkpointPreviewId]).toEqual(preview);
+
+    const removed = reduceServerFrame(hydrated, {
+      kind: "events",
+      events: [{
+        serverEpoch: "epoch-a",
+        sequence: 8,
+        occurredAt: "2026-08-14T08:01:00.000Z",
+        sessionId,
+        type: "checkpoint.removed",
+        payload: { sessionId, previewId: checkpointPreviewId },
+      }],
+    }).state;
+    expect(removed.checkpointPreviewIds).toEqual([]);
+
+    const previewed = reduceServerFrame(removed, {
+      kind: "events",
+      events: [{
+        serverEpoch: "epoch-a",
+        sequence: 9,
+        occurredAt: "2026-08-14T08:01:01.000Z",
+        sessionId,
+        type: "checkpoint.previewed",
+        payload: preview,
+      }],
+    }).state;
+    const completed = reduceServerFrame(previewed, {
+      kind: "events",
+      events: [{
+        serverEpoch: "epoch-a",
+        sequence: 10,
+        occurredAt: "2026-08-14T08:01:02.000Z",
+        sessionId,
+        type: "checkpoint.completed",
+        payload: {
+          sessionId,
+          previewId: checkpointPreviewId,
+          status: "partial",
+          failedFiles: ["src/app.ts"],
+        },
+      }],
+    }).state;
+    expect(completed.checkpointPreviewIds).toEqual([]);
+    expect(completed.checkpointPreviews[checkpointPreviewId]).toBeUndefined();
+    expect(completed.checkpointCompletions[checkpointPreviewId]).toEqual({
+      sessionId,
+      previewId: checkpointPreviewId,
+      status: "partial",
+      failedFiles: ["src/app.ts"],
+    });
+
+    const secondPreview = { ...preview, id: otherCheckpointPreviewId };
+    const previewedAgain = reduceServerFrame(completed, {
+      kind: "events",
+      events: [{
+        serverEpoch: "epoch-a",
+        sequence: 11,
+        occurredAt: "2026-08-14T08:01:03.000Z",
+        sessionId,
+        type: "checkpoint.previewed",
+        payload: secondPreview,
+      }],
+    }).state;
+    const replaced = reduceServerFrame(previewedAgain, {
+      kind: "events",
+      events: [{
+        serverEpoch: "epoch-a",
+        sequence: 12,
+        occurredAt: "2026-08-14T08:01:04.000Z",
+        sessionId,
+        type: "conversation.replaced",
+        payload: { sessionId, items: [] },
+      }],
+    }).state;
+    expect(replaced.checkpointPreviewIds).toEqual([]);
+    expect(replaced.checkpointPreviews[otherCheckpointPreviewId]).toBeUndefined();
   });
 
   it("deduplicates opened interactions and removes resolved cards", () => {
@@ -334,6 +436,49 @@ describe("application reducer", () => {
             capabilities: [], hooks: [], rawEvents: [], errors: [],
           },
         },
+        checkpointPreviewIds: [checkpointPreviewId, otherCheckpointPreviewId],
+        checkpointPreviews: {
+          [checkpointPreviewId]: {
+            id: checkpointPreviewId,
+            sessionId,
+            userMessageId: "00000000-0000-4000-8000-000000000b05",
+            scope: "files" as const,
+            expiresAt: "2026-08-14T08:06:00.000Z",
+            canRewind: true,
+            status: "ready" as const,
+            filesChanged: [],
+            insertions: 0,
+            deletions: 0,
+            failedFiles: [],
+          },
+          [otherCheckpointPreviewId]: {
+            id: otherCheckpointPreviewId,
+            sessionId: otherSessionId,
+            userMessageId: "00000000-0000-4000-8000-000000000b0a",
+            scope: "files" as const,
+            expiresAt: "2026-08-14T08:06:00.000Z",
+            canRewind: true,
+            status: "ready" as const,
+            filesChanged: [],
+            insertions: 0,
+            deletions: 0,
+            failedFiles: [],
+          },
+        },
+        checkpointCompletions: {
+          [checkpointPreviewId]: {
+            sessionId,
+            previewId: checkpointPreviewId,
+            status: "success" as const,
+            failedFiles: [],
+          },
+          [otherCheckpointPreviewId]: {
+            sessionId: otherSessionId,
+            previewId: otherCheckpointPreviewId,
+            status: "success" as const,
+            failedFiles: [],
+          },
+        },
         commandOwnerships: [
           { commandId, owner: { surface: "runtime" as const, control: "model" as const, sessionId } },
           { commandId: otherCommand, owner: { surface: "runtime" as const, control: "model" as const, sessionId: otherSessionId } },
@@ -364,6 +509,7 @@ describe("application reducer", () => {
         interactionIds: [otherInteraction],
         taskIds: [otherTask],
         mcpServerIds: [otherMcp],
+        checkpointPreviewIds: [otherCheckpointPreviewId],
         selectedSessionId: expectedSelected,
         settingsOpen: expectedSettingsOpen,
         detailsSelection: null,
@@ -384,6 +530,8 @@ describe("application reducer", () => {
         reduced.tasks,
         reduced.mcpServers,
         reduced.runtime,
+        reduced.checkpointPreviews,
+        reduced.checkpointCompletions,
       ]) {
         expect(JSON.stringify(collection)).not.toContain(sessionId);
         expect(JSON.stringify(collection)).toContain(otherSessionId);

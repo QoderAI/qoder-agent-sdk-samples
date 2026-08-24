@@ -20,6 +20,17 @@ class MemoryWorkspaceRepository implements WorkspaceRepository {
     return [...this.workspaces.values()];
   }
 
+  async registerOrGetByPath(
+    workspace: StoredWorkspace,
+  ): Promise<StoredWorkspace> {
+    const existing = [...this.workspaces.values()].find(
+      (candidate) => candidate.path === workspace.path,
+    );
+    if (existing !== undefined) return existing;
+    this.workspaces.set(workspace.id, workspace);
+    return workspace;
+  }
+
   async upsert(workspace: StoredWorkspace): Promise<void> {
     this.workspaces.set(workspace.id, workspace);
   }
@@ -115,6 +126,29 @@ describe("Workspace commands", () => {
       path: canonicalRoot,
       displayName: canonicalRoot,
     });
+  });
+
+  it("returns one persisted Workspace when the same path is registered concurrently", async () => {
+    const path = await makeProject("concurrent-register");
+    const repository = new MemoryWorkspaceRepository();
+    const ids = [
+      "00000000-0000-4000-8000-000000000821",
+      "00000000-0000-4000-8000-000000000822",
+    ];
+    const workspaces = new WorkspaceService({
+      repository,
+      picker: { pick: async () => null },
+      journal: new EventJournal({ epoch: "concurrent-register", capacity: 10 }),
+      createUuid: () => ids.shift() ?? "00000000-0000-4000-8000-000000000823",
+    });
+
+    const [first, second] = await Promise.all([
+      workspaces.register(path),
+      workspaces.register(path),
+    ]);
+
+    expect(first.id).toBe(second.id);
+    expect([...repository.workspaces.values()]).toEqual([first]);
   });
 
   it("lists a touched Workspace first without changing its id or path", async () => {

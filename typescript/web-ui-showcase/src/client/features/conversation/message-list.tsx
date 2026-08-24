@@ -10,6 +10,10 @@ export function MessageList(props: {
   onSelectAgent?: (
     item: Extract<ConversationItem, { kind: "tool" }>,
   ) => void;
+  onCheckpoint?: (
+    item: Extract<ConversationItem, { kind: "user" }>,
+    trigger: HTMLButtonElement,
+  ) => void;
 }): JSX.Element {
   const list = useRef<HTMLDivElement>(null);
   const followLatest = useRef(true);
@@ -42,6 +46,9 @@ export function MessageList(props: {
             {...(props.onSelectAgent === undefined
               ? {}
               : { onSelectAgent: props.onSelectAgent })}
+            {...(props.onCheckpoint === undefined
+              ? {}
+              : { onCheckpoint: props.onCheckpoint })}
           />
         </EventBoundary>
       ))}

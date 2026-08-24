@@ -30,7 +30,6 @@ const config: ServerConfig = {
   eventCapacity: 1_000,
   enableCheckpoints: true,
   rawEvents: true,
-  devOrigin: `http://${host}:${port}`,
   allowedOrigins: new Set([`http://${host}:${port}`]),
 };
 const app = await createApp({

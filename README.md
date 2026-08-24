@@ -3,6 +3,12 @@
 Runnable, focused examples for building applications with the Qoder Agent SDK.
 Every sample is available in TypeScript and Python.
 
+## Application templates
+
+| Template | What it demonstrates | Language |
+| --- | --- | --- |
+| [Web UI showcase](typescript/web-ui-showcase) | A complete local project agent with Sessions, streaming, inline interactions, MCP, Hooks, Tasks, Credits, Checkpoints, errors, shutdown, and resume | TypeScript |
+
 ## Samples
 
 | Sample | What it demonstrates | TypeScript | Python |

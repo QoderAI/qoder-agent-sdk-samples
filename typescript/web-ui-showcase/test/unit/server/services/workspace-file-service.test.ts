@@ -51,6 +51,10 @@ class MemoryWorkspaceRepository implements WorkspaceRepository {
     return [this.workspace];
   }
 
+  async registerOrGetByPath(): Promise<StoredWorkspace> {
+    return this.workspace;
+  }
+
   async upsert(): Promise<void> {}
 
   async remove(): Promise<void> {}
@@ -201,7 +205,7 @@ describe("WorkspaceFileService", () => {
     expect(entryResult.truncated).toBe(true);
   });
 
-  it("searches Workspace and allowed roots with independent limits and canonical mentions", async () => {
+  it("shares one scan budget and gives the Workspace root priority", async () => {
     const root = await temporaryDirectory("qoder-file-workspace-");
     const allowed = await temporaryDirectory("qoder-file-allowed-");
     await Promise.all([
@@ -223,12 +227,6 @@ describe("WorkspaceFileService", () => {
 
     expect(result.items).toEqual([
       {
-        path: "allowed.ts",
-        mention: join(allowed, "allowed.ts"),
-        rootLabel: basename(allowed),
-        source: "allowed",
-      },
-      {
         path: "second.ts",
         mention: "second.ts",
         rootLabel: "fixture",
@@ -236,6 +234,36 @@ describe("WorkspaceFileService", () => {
       },
     ]);
     expect(result.truncated).toBe(true);
+  });
+
+  it("stops an in-flight scan when its request is aborted", async () => {
+    const root = await temporaryDirectory("qoder-file-abort-");
+    await writeFile(join(root, "match.ts"), "export {};\n", "utf8");
+    const service = await createService(root);
+    let enterScan: (() => void) | undefined;
+    let releaseScan: (() => void) | undefined;
+    const entered = new Promise<void>((resolve) => {
+      enterScan = resolve;
+    });
+    const blocked = new Promise<void>((resolve) => {
+      releaseScan = resolve;
+    });
+    scanControl.afterRead = async () => {
+      enterScan?.();
+      await blocked;
+    };
+    const controller = new AbortController();
+
+    const search = service.search(
+      "00000000-0000-4000-8000-000000000d21",
+      "match",
+      controller.signal,
+    );
+    await entered;
+    controller.abort();
+    releaseScan?.();
+
+    await expect(search).rejects.toMatchObject({ name: "AbortError" });
   });
 
   it("skips an authorized root replaced by a symlink before scanning", async () => {

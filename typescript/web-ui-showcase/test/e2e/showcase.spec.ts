@@ -12,8 +12,14 @@ test.describe.configure({ mode: "serial" });
 const selectedSession = (page: Page): Locator =>
   page.getByRole("button", { name: /^选择 Session：/ }).first();
 
-async function snapshot(request: APIRequestContext) {
-  const response = await request.get("/api/snapshot");
+async function snapshot(
+  request: APIRequestContext,
+  sessionId?: string,
+) {
+  const query = sessionId === undefined
+    ? ""
+    : `?sessionId=${encodeURIComponent(sessionId)}`;
+  const response = await request.get(`/api/snapshot${query}`);
   expect(response.ok()).toBe(true);
   return appSnapshotSchema.parse(await response.json());
 }
@@ -324,8 +330,7 @@ test("completes commands, semantic streaming, interactions, product details, and
   await settings.getByRole("button", { name: "关闭 设置" }).click();
 
   const userTurn = page.getByRole("article", { name: "用户消息" }).last();
-  await expect(userTurn.getByLabel("Checkpoint 范围")).toHaveCount(0);
-  await expect(userTurn.getByRole("button", { name: "回到这里" })).toHaveCount(0);
+  await expect(userTurn.getByRole("button", { name: "Checkpoint" })).toBeVisible();
 
   await page.setViewportSize({ width: 1280, height: 500 });
   const transcript = page.getByTestId("conversation-scroll");
@@ -358,6 +363,91 @@ test("completes commands, semantic streaming, interactions, product details, and
   await expect(page.getByRole("textbox", { name: "消息" })).toBeEnabled();
   await expect(page.getByRole("article", { name: "用户消息" }).first()).toBeVisible();
   await expect(page.getByText(/Session 恢复请求已接受/)).toHaveCount(0);
+});
+
+test("previews and executes an accessible Checkpoint with transcript replacement", async ({
+  page,
+  request,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 760 });
+  await startSessionFromHero(page, "验证 Checkpoint 回退");
+  await completeFixtureTurn(page);
+
+  const userTurn = page.getByRole("article", { name: "用户消息" }).last();
+  const trigger = userTurn.getByRole("button", { name: "Checkpoint" });
+  await trigger.focus();
+  await trigger.press("Enter");
+  let dialog = page.getByRole("dialog", { name: "回退到这条消息" });
+  await expect(dialog.getByRole("radio", { name: "仅文件" })).toBeFocused();
+  await expect(dialog.getByRole("radio", { name: "仅对话" })).toBeEnabled();
+  await expect(dialog.getByRole("radio", { name: "文件和对话" })).toBeEnabled();
+  await page.keyboard.press("Shift+Tab");
+  expect(await dialog.evaluate((element) => element.contains(document.activeElement)))
+    .toBe(true);
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await trigger.scrollIntoViewIfNeeded();
+  await trigger.press("Enter");
+  dialog = page.getByRole("dialog", { name: "回退到这条消息" });
+  await expect(dialog).toBeVisible();
+  const mobileGeometry = await dialog.evaluate((element) => {
+    const bounds = element.getBoundingClientRect();
+    return {
+      left: bounds.left,
+      right: bounds.right,
+      width: bounds.width,
+      viewportWidth: innerWidth,
+      documentWidth: document.documentElement.scrollWidth,
+    };
+  });
+  expect(mobileGeometry.left).toBeGreaterThanOrEqual(0);
+  expect(mobileGeometry.right).toBeLessThanOrEqual(mobileGeometry.viewportWidth);
+  expect(mobileGeometry.width).toBeLessThanOrEqual(mobileGeometry.viewportWidth);
+  expect(mobileGeometry.documentWidth).toBe(mobileGeometry.viewportWidth);
+
+  await dialog.getByRole("radio", { name: "文件和对话" }).check();
+  const previewResponse = page.waitForResponse((response) => {
+    const path = new URL(response.url()).pathname;
+    return response.request().method() === "POST" &&
+      path.endsWith("/checkpoints/preview");
+  });
+  await dialog.getByRole("button", { name: "预览影响" }).click();
+  expect((await previewResponse).status()).toBe(202);
+  await expect(dialog.getByRole("heading", { name: "预览结果" })).toBeVisible();
+  await expect(dialog.getByText("README.md")).toBeVisible();
+  await expect(dialog.getByText("+4")).toBeVisible();
+  await expect(dialog.getByText("−1")).toBeVisible();
+
+  const executeResponse = page.waitForResponse((response) => {
+    const path = new URL(response.url()).pathname;
+    return response.request().method() === "POST" &&
+      path.endsWith("/checkpoints/execute");
+  });
+  await dialog.getByRole("button", { name: "执行 Checkpoint" }).click();
+  expect((await executeResponse).status()).toBe(202);
+  await expect(dialog.getByText("Checkpoint 已完成，对话已重新加载。"))
+    .toBeVisible();
+
+  await expect(page.getByRole("article", { name: "用户消息" })).toHaveCount(1);
+  await expect(page.getByLabel("assistant 消息")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /Write.*已完成/ })).toHaveCount(0);
+  const summary = await snapshot(request);
+  const session = summary.sessions[0];
+  expect(session).toBeDefined();
+  if (session === undefined) {
+    throw new Error("The Checkpoint journey must own one Session.");
+  }
+  const current = await snapshot(request, session.id);
+  expect(current.checkpointPreviews).toEqual([]);
+  expect(current.messages[session.id]).toMatchObject([
+    { kind: "user", text: "验证 Checkpoint 回退" },
+  ]);
+
+  await dialog.getByRole("button", { name: "关闭" }).click();
+  await expect(dialog).toHaveCount(0);
 });
 
 test("keeps the bottom Session menu visible and applies rename and delete", async ({

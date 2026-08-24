@@ -29,9 +29,17 @@ function setup(capabilities = ["session_rewind_v1"]) {
     failedFiles: [],
   }));
   const query = { rewindFiles, rewind } as unknown as QueryPort;
+  let revision = 0;
+  let lifecycle: ReturnType<SessionController["lifecycle"]> = {
+    phase: "idle",
+    awaitingUser: false,
+  };
   const controller = {
     query: () => query,
     capabilities: () => capabilities,
+    lifecycle: () => ({ ...lifecycle }),
+    transcriptRevision: () => revision,
+    bumpTranscriptRevision: () => ++revision,
   } as unknown as SessionController;
   const registry = new SessionRegistry();
   registry.reserve(sessionId, controller);
@@ -47,15 +55,31 @@ function setup(capabilities = ["session_rewind_v1"]) {
       },
     ]),
   } as unknown as SessionCatalog;
+  const previewIds = [
+    previewId,
+    "00000000-0000-4000-8000-000000000a04",
+    "00000000-0000-4000-8000-000000000a05",
+  ];
   const service = new CheckpointService({
     registry,
     catalog,
     journal,
     getSession: () => ({ cwd: "/repo" }),
-    createUuid: () => previewId,
+    createUuid: () => previewIds.shift() ?? crypto.randomUUID(),
     now: () => new Date("2026-08-14T08:00:00.000Z"),
   });
-  return { service, journal, registry, rewindFiles, rewind, catalog };
+  return {
+    service,
+    journal,
+    registry,
+    rewindFiles,
+    rewind,
+    catalog,
+    controller,
+    setLifecycle: (next: ReturnType<SessionController["lifecycle"]>) => {
+      lifecycle = next;
+    },
+  };
 }
 
 describe("Checkpoint previews", () => {
@@ -140,6 +164,139 @@ describe("Checkpoint previews", () => {
         scope: "files",
       }),
     ).rejects.toMatchObject({ code: "CHECKPOINT_PREVIEW_INVALID" });
+  });
+
+  it("rejects previews while the Session is running or awaiting input", async () => {
+    const running = setup();
+    running.setLifecycle({ phase: "running", awaitingUser: false });
+    await expect(
+      running.service.preview(sessionId, {
+        userMessageId: messageId,
+        scope: "files",
+      }),
+    ).rejects.toMatchObject({ code: "CHECKPOINT_SESSION_BUSY" });
+
+    const awaiting = setup();
+    awaiting.setLifecycle({ phase: "idle", awaitingUser: true });
+    await expect(
+      awaiting.service.preview(sessionId, {
+        userMessageId: messageId,
+        scope: "files",
+      }),
+    ).rejects.toMatchObject({ code: "CHECKPOINT_SESSION_BUSY" });
+  });
+
+  it("discards a dry run when the transcript revision changes", async () => {
+    const harness = setup();
+    let releasePreview: (() => void) | undefined;
+    const previewGate = new Promise<{
+      canRewind: true;
+      filesChanged: string[];
+      insertions: number;
+      deletions: number;
+      dryRun: true;
+    }>((resolve) => {
+      releasePreview = () => resolve({
+        canRewind: true,
+        filesChanged: ["src/app.ts"],
+        insertions: 3,
+        deletions: 1,
+        dryRun: true,
+      });
+    });
+    harness.rewindFiles.mockImplementationOnce(async () => previewGate);
+
+    const preview = harness.service.preview(sessionId, {
+      userMessageId: messageId,
+      scope: "files",
+    });
+    await vi.waitFor(() => expect(harness.rewindFiles).toHaveBeenCalledOnce());
+    harness.controller.bumpTranscriptRevision();
+    releasePreview?.();
+
+    await expect(preview).rejects.toMatchObject({
+      code: "CHECKPOINT_PREVIEW_STALE",
+    });
+    expect(harness.service.previews(sessionId)).toEqual([]);
+  });
+
+  it("invalidates sibling previews when one preview is executed", async () => {
+    const { service, journal } = setup();
+    const selected = await service.preview(sessionId, {
+      userMessageId: messageId,
+      scope: "files",
+    });
+    const sibling = await service.preview(sessionId, {
+      userMessageId: messageId,
+      scope: "files",
+    });
+
+    await service.execute(sessionId, {
+      previewId: selected.id,
+      userMessageId: messageId,
+      scope: "files",
+    });
+
+    expect(service.previews(sessionId)).toEqual([]);
+    const replay = journal.replay({ epoch: "epoch-checkpoint", after: 0 });
+    expect(replay.kind).toBe("events");
+    const removedIds = replay.kind === "events"
+      ? replay.events.flatMap((event) =>
+          event.type === "checkpoint.removed"
+            ? [event.payload.previewId]
+            : [],
+        )
+      : [];
+    expect(removedIds).toEqual([selected.id, sibling.id]);
+    await expect(service.execute(sessionId, {
+      previewId: sibling.id,
+      userMessageId: messageId,
+      scope: "files",
+    })).rejects.toMatchObject({ code: "CHECKPOINT_PREVIEW_INVALID" });
+  });
+
+  it("serializes simultaneous execution and blocks message submission until history reloads", async () => {
+    const harness = setup();
+    await harness.service.preview(sessionId, {
+      userMessageId: messageId,
+      scope: "files",
+    });
+    let releaseExecution: (() => void) | undefined;
+    const executionGate = new Promise<{
+      canRewind: true;
+      filesChanged: string[];
+      insertions: number;
+      deletions: number;
+      dryRun: undefined;
+    }>((resolve) => {
+      releaseExecution = () => resolve({
+        canRewind: true,
+        filesChanged: ["src/app.ts"],
+        insertions: 3,
+        deletions: 1,
+        dryRun: undefined,
+      });
+    });
+    harness.rewindFiles.mockImplementationOnce(async () => executionGate);
+    const command = {
+      previewId,
+      userMessageId: messageId,
+      scope: "files" as const,
+    };
+
+    const first = harness.service.execute(sessionId, command);
+    await vi.waitFor(() => expect(harness.rewindFiles).toHaveBeenCalledTimes(2));
+    const second = harness.service.execute(sessionId, command);
+    expect(() => harness.registry.assertNoPendingMutation(sessionId)).toThrow(
+      expect.objectContaining({ code: "SESSION_MUTATION_PENDING" }),
+    );
+    releaseExecution?.();
+
+    await expect(first).resolves.toBeUndefined();
+    await expect(second).rejects.toMatchObject({
+      code: "CHECKPOINT_PREVIEW_INVALID",
+    });
+    expect(harness.registry.hasPendingMutation(sessionId)).toBe(false);
   });
 
   it("uses full rewind scopes and rejects unsupported conversation rewind", async () => {

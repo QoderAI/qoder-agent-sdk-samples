@@ -70,6 +70,83 @@ describe("SessionRegistry", () => {
     expect(started).toEqual(["terminal", "guarded"]);
   });
 
+  it("registers mutation intent immediately and preserves per-Session ordering", async () => {
+    const registry = new SessionRegistry();
+    const started: string[] = [];
+    let releaseGuarded: (() => void) | undefined;
+    const guardedGate = new Promise<void>((resolve) => {
+      releaseGuarded = resolve;
+    });
+    let releaseFirstMutation: (() => void) | undefined;
+    const firstMutationGate = new Promise<void>((resolve) => {
+      releaseFirstMutation = resolve;
+    });
+    let releaseSecondMutation: (() => void) | undefined;
+    const secondMutationGate = new Promise<void>((resolve) => {
+      releaseSecondMutation = resolve;
+    });
+
+    const guarded = registry.runGuarded(sessionId, async () => {
+      started.push("guarded");
+      await guardedGate;
+    });
+    await vi.waitFor(() => expect(started).toEqual(["guarded"]));
+
+    const firstMutation = registry.runMutation(sessionId, async () => {
+      started.push("mutation-1");
+      await firstMutationGate;
+    });
+    const secondMutation = registry.runMutation(sessionId, async () => {
+      started.push("mutation-2");
+      await secondMutationGate;
+    });
+    const laterGuarded = registry.runGuarded(sessionId, async () => {
+      started.push("later-guarded");
+    });
+
+    expect(registry.hasPendingMutation(sessionId)).toBe(true);
+    expect(() => registry.assertNoPendingMutation(sessionId)).toThrow(
+      expect.objectContaining({ code: "SESSION_MUTATION_PENDING" }),
+    );
+    releaseGuarded?.();
+    await vi.waitFor(() =>
+      expect(started).toEqual(["guarded", "mutation-1"]),
+    );
+    releaseFirstMutation?.();
+    await vi.waitFor(() =>
+      expect(started).toEqual(["guarded", "mutation-1", "mutation-2"]),
+    );
+    expect(registry.hasPendingMutation(sessionId)).toBe(true);
+    releaseSecondMutation?.();
+
+    await Promise.all([
+      guarded,
+      firstMutation,
+      secondMutation,
+      laterGuarded,
+    ]);
+    expect(started).toEqual([
+      "guarded",
+      "mutation-1",
+      "mutation-2",
+      "later-guarded",
+    ]);
+    expect(registry.hasPendingMutation(sessionId)).toBe(false);
+    expect(() => registry.assertNoPendingMutation(sessionId)).not.toThrow();
+  });
+
+  it("clears mutation intent after a failed mutation", async () => {
+    const registry = new SessionRegistry();
+
+    const mutation = registry.runMutation(sessionId, async () => {
+      throw new Error("rewind failed");
+    });
+    expect(registry.hasPendingMutation(sessionId)).toBe(true);
+
+    await expect(mutation).rejects.toThrow("rewind failed");
+    expect(registry.hasPendingMutation(sessionId)).toBe(false);
+  });
+
   it("serializes operations for one Session without blocking another Session", async () => {
     const registry = new SessionRegistry();
     const started: string[] = [];

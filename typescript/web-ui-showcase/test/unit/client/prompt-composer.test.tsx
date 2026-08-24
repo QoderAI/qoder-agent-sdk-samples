@@ -46,6 +46,7 @@ function PromptComposer(props: {
   searchWorkspaceFiles?: (
     sessionId: string,
     query: string,
+    signal?: AbortSignal,
   ) => Promise<WorkspaceFileSearchResult>;
 }): JSX.Element {
   const [drafts] = useState(() => new ComposerDrafts());
@@ -97,7 +98,10 @@ beforeEach(() => {
   });
 });
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
 
 function deferred<T>(): {
   promise: Promise<T>;
@@ -159,9 +163,12 @@ describe("PromptComposer", () => {
 
     await user.type(textarea, "查看 @src");
 
-    expect(searchWorkspaceFiles).toHaveBeenLastCalledWith(
-      session.id,
-      "src",
+    await vi.waitFor(() =>
+      expect(searchWorkspaceFiles).toHaveBeenLastCalledWith(
+        session.id,
+        "src",
+        expect.anything(),
+      ),
     );
     const listbox = await screen.findByRole("listbox", { name: "文件建议" });
     expect(within(listbox).getByText("仅显示前 40 个结果")).toBeInTheDocument();
@@ -177,19 +184,17 @@ describe("PromptComposer", () => {
     expect(textarea).toHaveValue('查看 @"/shared docs/guide.md" ');
   });
 
-  it("ignores stale file responses and closes discovery when Session changes", async () => {
-    const first = deferred<{
-      items: WorkspaceFileSearchResult["items"];
-      truncated: boolean;
-    }>();
-    const second = deferred<{
-      items: WorkspaceFileSearchResult["items"];
-      truncated: boolean;
-    }>();
-    const searchWorkspaceFiles = vi
-      .fn()
-      .mockReturnValueOnce(first.promise)
-      .mockReturnValueOnce(second.promise);
+  it("debounces file discovery, aborts stale work, and closes on Session change", async () => {
+    vi.useFakeTimers();
+    const first = deferred<WorkspaceFileSearchResult>();
+    const second = deferred<WorkspaceFileSearchResult>();
+    const signals: AbortSignal[] = [];
+    const searchWorkspaceFiles = vi.fn(
+      (_sessionId: string, query: string, signal?: AbortSignal) => {
+        if (signal !== undefined) signals.push(signal);
+        return query === "s" ? first.promise : second.promise;
+      },
+    );
     const props = {
       session,
       queued: [],
@@ -204,9 +209,18 @@ describe("PromptComposer", () => {
       target: { value: "@s", selectionStart: 2 },
     });
     expect(screen.getByText("正在搜索项目文件…")).toBeInTheDocument();
+    await act(async () => vi.advanceTimersByTimeAsync(199));
+    expect(searchWorkspaceFiles).not.toHaveBeenCalled();
+    await act(async () => vi.advanceTimersByTimeAsync(1));
+    expect(searchWorkspaceFiles).toHaveBeenCalledTimes(1);
+    expect(signals[0]?.aborted).toBe(false);
+
     fireEvent.change(textarea, {
       target: { value: "@sr", selectionStart: 3 },
     });
+    expect(signals[0]?.aborted).toBe(true);
+    await act(async () => vi.advanceTimersByTimeAsync(200));
+    expect(searchWorkspaceFiles).toHaveBeenCalledTimes(2);
     await act(async () =>
       second.resolve({
         items: [{
@@ -218,7 +232,7 @@ describe("PromptComposer", () => {
         truncated: false,
       }),
     );
-    expect(await screen.findByRole("option", { name: /src\/right.ts/ })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /src\/right.ts/ })).toBeInTheDocument();
     await act(async () =>
       first.resolve({
         items: [{
@@ -242,6 +256,7 @@ describe("PromptComposer", () => {
         }}
       />,
     );
+    expect(signals[1]?.aborted).toBe(true);
     expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
     expect(screen.getByLabelText("消息")).toHaveValue("");
   });

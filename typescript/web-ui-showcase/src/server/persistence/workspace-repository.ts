@@ -22,12 +22,26 @@ const workspaceStoreSchema = z
     schemaVersion: z.literal(1),
     workspaces: z.array(storedWorkspaceSchema),
   })
-  .strict();
+  .strict()
+  .superRefine((store, context) => {
+    const paths = new Set<string>();
+    for (const [index, workspace] of store.workspaces.entries()) {
+      if (paths.has(workspace.path)) {
+        context.addIssue({
+          code: "custom",
+          message: "Workspace paths must be unique.",
+          path: ["workspaces", index, "path"],
+        });
+      }
+      paths.add(workspace.path);
+    }
+  });
 
 export type StoredWorkspace = z.infer<typeof storedWorkspaceSchema>;
 
 export interface WorkspaceRepository {
   list(): Promise<StoredWorkspace[]>;
+  registerOrGetByPath(workspace: StoredWorkspace): Promise<StoredWorkspace>;
   upsert(workspace: StoredWorkspace): Promise<void>;
   remove(workspaceId: string): Promise<void>;
 }
@@ -127,9 +141,34 @@ export function createJsonWorkspaceRepository(
         const store = await readStore();
         return [...store.workspaces];
       }),
+    registerOrGetByPath: (workspace) =>
+      serialize(async () => {
+        const store = await readStore();
+        const existing = store.workspaces.find(
+          (candidate) => candidate.path === workspace.path,
+        );
+        if (existing !== undefined) {
+          return existing;
+        }
+        store.workspaces.push(workspace);
+        await writeStore(store);
+        return workspace;
+      }),
     upsert: (workspace) =>
       serialize(async () => {
         const store = await readStore();
+        const conflict = store.workspaces.find(
+          (candidate) =>
+            candidate.path === workspace.path && candidate.id !== workspace.id,
+        );
+        if (conflict !== undefined) {
+          throw new AppError({
+            code: "WORKSPACE_STORE_INVALID",
+            message: "Workspace metadata is invalid.",
+            status: 500,
+            retryable: false,
+          });
+        }
         const index = store.workspaces.findIndex(
           (candidate) => candidate.id === workspace.id,
         );

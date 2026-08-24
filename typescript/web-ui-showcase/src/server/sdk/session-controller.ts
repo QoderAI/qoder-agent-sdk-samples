@@ -61,6 +61,8 @@ export class SessionController {
   readonly #messages = new Map<string, ConversationItem>();
   readonly #tasks = new Map<string, TaskView>();
   readonly #runtimeState: SessionRuntimeState;
+  readonly #activeInputBatch = new Set<string>();
+  #sdkStateObserved = false;
   #lifecycle: SessionLifecycle = {
     phase: "restorable",
     awaitingUser: false,
@@ -76,6 +78,7 @@ export class SessionController {
   #activeAssistantItemId: string | undefined;
   #activeAssistantSegments: AssistantSegment[] = [];
   #contextRequestSequence = 0;
+  #transcriptRevision = 0;
 
   constructor(options: {
     sessionId: string;
@@ -142,6 +145,7 @@ export class SessionController {
       });
       this.#unsubscribeInput = this.#input.subscribe((change) => {
         if ("removed" in change) {
+          this.#activeInputBatch.delete(change.uuid);
           this.#journal.publish(
             {
               type: "input.removed",
@@ -166,6 +170,13 @@ export class SessionController {
           { type: "input.upserted", payload: view },
           { sessionId: this.#sessionId },
         );
+        if (change.state === "delivered") {
+          if (change.shouldQuery) {
+            this.#activeInputBatch.add(change.uuid);
+          } else {
+            this.#input.acknowledgeDelivered(change.uuid);
+          }
+        }
       });
       this.#unsubscribeInteractions = this.#interactions.subscribe(
         this.#sessionId,
@@ -242,7 +253,12 @@ export class SessionController {
     if (this.#input.cancelBuffered(uuid)) {
       return true;
     }
-    return this.#query.cancelAsyncMessage(uuid);
+    const cancelled = await this.#query.cancelAsyncMessage(uuid);
+    if (cancelled) {
+      this.#activeInputBatch.delete(uuid);
+      this.#input.acknowledgeDelivered(uuid);
+    }
+    return cancelled;
   }
 
   async interrupt(): Promise<void> {
@@ -259,9 +275,33 @@ export class SessionController {
       awaitingUser: this.#lifecycle.awaitingUser,
     });
     try {
-      await this.#query.interrupt();
+      const receipt = await this.#query.interrupt();
       this.#finishActiveAssistant("interrupted");
-      this.#setLifecycle({ phase: "idle", awaitingUser: false });
+      if (receipt === undefined) {
+        this.#acknowledgeActiveInputBatch();
+        this.#setLifecycle({ phase: "idle", awaitingUser: false });
+        return;
+      }
+      const stillQueued = new Set(receipt.still_queued);
+      for (const uuid of receipt.cancelled ?? []) {
+        this.#input.acknowledgeDelivered(uuid);
+      }
+      for (const uuid of this.#activeInputBatch) {
+        if (!stillQueued.has(uuid)) {
+          this.#input.acknowledgeDelivered(uuid);
+        }
+      }
+      this.#activeInputBatch.clear();
+      for (const uuid of stillQueued) {
+        this.#activeInputBatch.add(uuid);
+      }
+      this.#setLifecycle({
+        phase: stillQueued.size === 0 ? "idle" : "running",
+        awaitingUser: false,
+      });
+      if (stillQueued.size === 0) {
+        void this.refreshContext({ required: false });
+      }
     } catch (error) {
       this.#setLifecycle({
         phase: "running",
@@ -294,6 +334,15 @@ export class SessionController {
 
   capabilities(): readonly string[] {
     return this.#capabilities;
+  }
+
+  transcriptRevision(): number {
+    return this.#transcriptRevision;
+  }
+
+  bumpTranscriptRevision(): number {
+    this.#transcriptRevision += 1;
+    return this.#transcriptRevision;
   }
 
   query(): QueryPort {
@@ -593,18 +642,36 @@ export class SessionController {
       case "runtime.patch":
         this.#runtimeState.merge(this.#sessionId, action.patch);
         return;
+      case "session.state":
+        this.#sdkStateObserved = true;
+        if (this.#closing) return;
+        if (action.state === "idle") {
+          this.#acknowledgeActiveInputBatch();
+          this.#setLifecycle({ phase: "idle", awaitingUser: false });
+          void this.refreshContext({ required: false });
+          return;
+        }
+        this.#setLifecycle({
+          phase: "running",
+          awaitingUser: action.state === "requires_action",
+        });
+        return;
       case "turn.completed":
         this.#finishActiveAssistant(action.success ? "complete" : "failed");
-        for (const queued of this.#input.list()) {
-          if (queued.state === "delivered") {
-            this.#input.acknowledgeDelivered(queued.uuid);
-          }
-        }
-        if (!this.#closing) {
+        if (!this.#closing && !this.#sdkStateObserved) {
+          this.#acknowledgeActiveInputBatch();
           this.#setLifecycle({ phase: "idle", awaitingUser: false });
           void this.refreshContext({ required: false });
         }
         return;
+    }
+  }
+
+  #acknowledgeActiveInputBatch(): void {
+    const completed = [...this.#activeInputBatch];
+    this.#activeInputBatch.clear();
+    for (const uuid of completed) {
+      this.#input.acknowledgeDelivered(uuid);
     }
   }
 

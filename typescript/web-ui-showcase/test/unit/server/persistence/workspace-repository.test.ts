@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -44,6 +44,41 @@ describe("JSON Workspace repository", () => {
     const repository = createJsonWorkspaceRepository(path);
 
     expect(await repository.list()).toEqual([]);
+  });
+
+  it("atomically returns the persisted Workspace for a duplicate path", async () => {
+    const path = await createStorePath();
+    const repository = createJsonWorkspaceRepository(path);
+    const duplicate = {
+      ...second,
+      path: first.path,
+    };
+
+    const [registered, existing] = await Promise.all([
+      repository.registerOrGetByPath(first),
+      repository.registerOrGetByPath(duplicate),
+    ]);
+
+    expect(registered).toEqual(first);
+    expect(existing).toEqual(first);
+    expect(await repository.list()).toEqual([first]);
+  });
+
+  it("rejects persisted metadata containing duplicate paths", async () => {
+    const path = await createStorePath();
+    await writeFile(
+      path,
+      JSON.stringify({
+        schemaVersion: 1,
+        workspaces: [first, { ...second, path: first.path }],
+      }),
+      "utf8",
+    );
+
+    await expect(createJsonWorkspaceRepository(path).list()).rejects.toMatchObject({
+      code: "WORKSPACE_STORE_INVALID",
+      retryable: false,
+    });
   });
 
   it("persists upserts and removals as valid versioned JSON", async () => {

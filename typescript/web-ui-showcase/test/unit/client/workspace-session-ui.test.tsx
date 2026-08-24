@@ -535,9 +535,12 @@ describe("Workspace and Session shell", () => {
 
     await user.type(screen.getByLabelText("消息"), "@src");
 
-    expect(api.searchWorkspaceFiles).toHaveBeenLastCalledWith(
-      sessionId,
-      "src",
+    await vi.waitFor(() =>
+      expect(api.searchWorkspaceFiles).toHaveBeenLastCalledWith(
+        sessionId,
+        "src",
+        expect.any(AbortSignal),
+      ),
     );
     expect(await screen.findByRole("option", { name: /src\/app.ts/ })).toBeInTheDocument();
   });

@@ -50,6 +50,16 @@ class MemoryWorkspaceRepository implements WorkspaceRepository {
   async list(): Promise<StoredWorkspace[]> {
     return [...this.workspaces.values()];
   }
+  async registerOrGetByPath(
+    workspace: StoredWorkspace,
+  ): Promise<StoredWorkspace> {
+    const existing = [...this.workspaces.values()].find(
+      (candidate) => candidate.path === workspace.path,
+    );
+    if (existing !== undefined) return existing;
+    this.workspaces.set(workspace.id, workspace);
+    return workspace;
+  }
   async upsert(workspace: StoredWorkspace): Promise<void> {
     this.workspaces.set(workspace.id, workspace);
   }
@@ -240,6 +250,7 @@ async function setup(options: {
       ? {}
       : { initialMessages: options.initialMessages }),
   });
+  const registry = new SessionRegistry();
   const app = await createApp({
     assetRoot: null,
     journal,
@@ -248,10 +259,11 @@ async function setup(options: {
     directoryPicker: options.directoryPicker ?? { pick: async () => null },
     sessionCatalog: catalog,
     queryFactory: queryFactory.factory,
+    sessionRegistry: registry,
     interactionBroker: interactions,
   });
   apps.push(app);
-  return { app, journal, catalog, queryFactory, interactions };
+  return { app, journal, catalog, queryFactory, interactions, registry };
 }
 
 function waitForEvent(
@@ -340,6 +352,7 @@ describe("Session commands", () => {
         event.payload.textPreview === "检查这个项目",
     );
 
+    const beforeStart = journal.cursor();
     const response = await app.inject({
       method: "POST",
       url: "/api/sessions/start",
@@ -363,15 +376,44 @@ describe("Session commands", () => {
         shouldQuery: true,
       },
     });
+    const createdSessionId = response.json().sessionId as string;
+    const replay = journal.replay({
+      epoch: journal.epoch,
+      after: beforeStart,
+    });
+    expect(replay.kind).toBe("events");
+    if (replay.kind === "events") {
+      const sessionIndex = replay.events.findIndex(
+        (event) =>
+          event.type === "session.upserted" &&
+          event.payload.id === createdSessionId,
+      );
+      const messageIndex = replay.events.findIndex(
+        (event) =>
+          event.type === "conversation.item" &&
+          event.payload.sessionId === createdSessionId &&
+          event.payload.item.kind === "user",
+      );
+      expect(sessionIndex).toBeGreaterThanOrEqual(0);
+      expect(messageIndex).toBeGreaterThan(sessionIndex);
+    }
     const snapshot = await app.inject({
       method: "GET",
-      url: `/api/snapshot?sessionId=${response.json().sessionId}`,
+      url: `/api/snapshot?sessionId=${createdSessionId}`,
     });
     expect(snapshot.json().sessions).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          id: response.json().sessionId,
+          id: createdSessionId,
           phase: "running",
+        }),
+      ]),
+    );
+    expect(snapshot.json().messages[createdSessionId]).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "user",
+          text: "检查这个项目",
         }),
       ]),
     );
@@ -586,6 +628,280 @@ describe("Session commands", () => {
     expect(queryFactory.close).toHaveBeenCalledOnce();
     expect(catalog.delete).toHaveBeenCalledWith(expect.any(String), sessionId);
     expect(order).toEqual(["close", "catalog.delete", "session.removed"]);
+  });
+
+  it("invalidates Checkpoint previews when a new message is submitted", async () => {
+    const { app, journal, queryFactory } = await setup();
+    const idle = waitForEvent(
+      journal,
+      (event) =>
+        event.type === "session.upserted" &&
+        event.payload.id === sessionId &&
+        event.payload.phase === "idle",
+    );
+    await app.inject({
+      method: "POST",
+      url: `/api/sessions/${sessionId}/ensure`,
+      payload: {},
+    });
+    await idle;
+
+    const previewed = waitForEvent(
+      journal,
+      (event) =>
+        event.type === "checkpoint.previewed" &&
+        event.payload.sessionId === sessionId,
+    );
+    expect((await app.inject({
+      method: "POST",
+      url: `/api/sessions/${sessionId}/checkpoints/preview`,
+      payload: {
+        userMessageId: "00000000-0000-4000-8000-000000000704",
+        scope: "files",
+      },
+    })).statusCode).toBe(202);
+    const previewEvent = await previewed;
+    if (previewEvent.type !== "checkpoint.previewed") {
+      throw new Error("Expected a Checkpoint preview event");
+    }
+
+    const removed = waitForEvent(
+      journal,
+      (event) =>
+        event.type === "checkpoint.removed" &&
+        event.payload.previewId === previewEvent.payload.id,
+    );
+    expect((await app.inject({
+      method: "POST",
+      url: `/api/sessions/${sessionId}/messages`,
+      payload: { text: "这条消息使预览过期" },
+    })).statusCode).toBe(202);
+    await removed;
+
+    const controllerIdle = waitForEvent(
+      journal,
+      (event) =>
+        event.type === "session.lifecycle" &&
+        event.payload.sessionId === sessionId &&
+        event.payload.lifecycle.phase === "idle",
+    );
+    queryFactory.outputs[0]?.push({
+      type: "system",
+      subtype: "session_state_changed",
+      state: "idle",
+      uuid: "00000000-0000-4000-8000-00000000070b",
+      session_id: sessionId,
+    } satisfies SDKMessage);
+    await controllerIdle;
+
+    const failed = waitForEvent(
+      journal,
+      (event) =>
+        event.type === "command.failed" &&
+        event.payload.error.code === "CHECKPOINT_PREVIEW_INVALID",
+    );
+    expect((await app.inject({
+      method: "POST",
+      url: `/api/sessions/${sessionId}/checkpoints/execute`,
+      payload: {
+        previewId: previewEvent.payload.id,
+        userMessageId: previewEvent.payload.userMessageId,
+        scope: previewEvent.payload.scope,
+      },
+    })).statusCode).toBe(202);
+    await failed;
+  });
+
+  it("removes Checkpoint previews before deleting their Session", async () => {
+    const { app, journal } = await setup();
+    const idle = waitForEvent(
+      journal,
+      (event) =>
+        event.type === "session.upserted" &&
+        event.payload.id === sessionId &&
+        event.payload.phase === "idle",
+    );
+    await app.inject({
+      method: "POST",
+      url: `/api/sessions/${sessionId}/ensure`,
+      payload: {},
+    });
+    await idle;
+    const previewed = waitForEvent(
+      journal,
+      (event) =>
+        event.type === "checkpoint.previewed" &&
+        event.payload.sessionId === sessionId,
+    );
+    await app.inject({
+      method: "POST",
+      url: `/api/sessions/${sessionId}/checkpoints/preview`,
+      payload: {
+        userMessageId: "00000000-0000-4000-8000-000000000704",
+        scope: "files",
+      },
+    });
+    const preview = await previewed;
+    if (preview.type !== "checkpoint.previewed") {
+      throw new Error("Expected a Checkpoint preview event");
+    }
+    const beforeDelete = journal.cursor();
+    const removed = waitForEvent(
+      journal,
+      (event) =>
+        event.type === "session.removed" &&
+        event.payload.sessionId === sessionId,
+    );
+
+    expect((await app.inject({
+      method: "DELETE",
+      url: `/api/sessions/${sessionId}`,
+    })).statusCode).toBe(202);
+    await removed;
+
+    const replay = journal.replay({
+      epoch: journal.epoch,
+      after: beforeDelete,
+    });
+    expect(replay.kind).toBe("events");
+    expect(replay.kind === "events"
+      ? replay.events
+        .filter((event) =>
+          event.type === "checkpoint.removed" ||
+          event.type === "session.removed")
+        .map((event) => event.type)
+      : []).toEqual(["checkpoint.removed", "session.removed"]);
+    const snapshot = await app.inject({ method: "GET", url: "/api/snapshot" });
+    expect(snapshot.json()).toMatchObject({
+      sessions: [],
+      checkpointPreviews: [],
+    });
+  });
+
+  it("invalidates Checkpoint previews when MCP reconnect restarts the Query", async () => {
+    const { app, journal, queryFactory } = await setup({ mcpConnected: true });
+    const idle = waitForEvent(
+      journal,
+      (event) =>
+        event.type === "session.upserted" &&
+        event.payload.id === sessionId &&
+        event.payload.phase === "idle",
+    );
+    await app.inject({
+      method: "POST",
+      url: `/api/sessions/${sessionId}/ensure`,
+      payload: {},
+    });
+    await idle;
+    const previewed = waitForEvent(
+      journal,
+      (event) =>
+        event.type === "checkpoint.previewed" &&
+        event.payload.sessionId === sessionId,
+    );
+    await app.inject({
+      method: "POST",
+      url: `/api/sessions/${sessionId}/checkpoints/preview`,
+      payload: {
+        userMessageId: "00000000-0000-4000-8000-000000000704",
+        scope: "files",
+      },
+    });
+    const preview = await previewed;
+    if (preview.type !== "checkpoint.previewed") {
+      throw new Error("Expected a Checkpoint preview event");
+    }
+    const checkpointRemoved = waitForEvent(
+      journal,
+      (event) =>
+        event.type === "checkpoint.removed" &&
+        event.payload.previewId === preview.payload.id,
+    );
+    const restarted = waitForEvent(
+      journal,
+      (event) =>
+        event.type === "session.upserted" &&
+        event.payload.id === sessionId &&
+        event.payload.phase === "idle" &&
+        queryFactory.create.mock.calls.length === 2,
+    );
+
+    expect((await app.inject({
+      method: "POST",
+      url: `/api/sessions/${sessionId}/mcp/fixture-mcp/reconnect`,
+      payload: {},
+    })).statusCode).toBe(202);
+    await Promise.all([checkpointRemoved, restarted]);
+    expect(queryFactory.create).toHaveBeenCalledTimes(2);
+    expect(queryFactory.close).toHaveBeenCalledOnce();
+
+    const failed = waitForEvent(
+      journal,
+      (event) =>
+        event.type === "command.failed" &&
+        event.payload.error.code === "CHECKPOINT_PREVIEW_INVALID",
+    );
+    expect((await app.inject({
+      method: "POST",
+      url: `/api/sessions/${sessionId}/checkpoints/execute`,
+      payload: {
+        previewId: preview.payload.id,
+        userMessageId: preview.payload.userMessageId,
+        scope: preview.payload.scope,
+      },
+    })).statusCode).toBe(202);
+    await failed;
+  });
+
+  it("rejects direct message submission while a transcript mutation is pending", async () => {
+    const { app, journal, registry } = await setup();
+    const idle = waitForEvent(
+      journal,
+      (event) =>
+        event.type === "session.upserted" &&
+        event.payload.id === sessionId &&
+        event.payload.phase === "idle",
+    );
+    await app.inject({
+      method: "POST",
+      url: `/api/sessions/${sessionId}/ensure`,
+      payload: {},
+    });
+    await idle;
+
+    const mutationGate = deferred<void>();
+    const mutation = registry.runMutation(sessionId, async () => {
+      await mutationGate.promise;
+    });
+    const beforeSend = journal.cursor();
+    const failed = waitForEvent(
+      journal,
+      (event) =>
+        event.type === "command.failed" &&
+        event.payload.error.code === "SESSION_MUTATION_PENDING",
+    );
+    expect((await app.inject({
+      method: "POST",
+      url: `/api/sessions/${sessionId}/messages`,
+      payload: { text: "不应进入 SDK 输入队列" },
+    })).statusCode).toBe(202);
+    await failed;
+
+    const replay = journal.replay({
+      epoch: journal.epoch,
+      after: beforeSend,
+    });
+    expect(replay).toMatchObject({ kind: "events" });
+    if (replay.kind === "events") {
+      expect(replay.events).not.toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ type: "input.upserted" }),
+          expect.objectContaining({ type: "conversation.item" }),
+        ]),
+      );
+    }
+    mutationGate.resolve(undefined);
+    await mutation;
   });
 
   it("updates Session metadata from an SDK title event", async () => {

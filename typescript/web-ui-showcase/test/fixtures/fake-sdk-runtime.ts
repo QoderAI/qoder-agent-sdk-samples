@@ -17,6 +17,17 @@ export class FixtureWorkspaceRepository implements WorkspaceRepository {
     return [...this.#workspaces.values()].map((workspace) => ({ ...workspace }));
   }
 
+  async registerOrGetByPath(
+    workspace: StoredWorkspace,
+  ): Promise<StoredWorkspace> {
+    const existing = [...this.#workspaces.values()].find(
+      (candidate) => candidate.path === workspace.path,
+    );
+    if (existing !== undefined) return { ...existing };
+    this.#workspaces.set(workspace.id, { ...workspace });
+    return { ...workspace };
+  }
+
   async upsert(workspace: StoredWorkspace): Promise<void> {
     this.#workspaces.set(workspace.id, { ...workspace });
   }
@@ -77,6 +88,20 @@ export class FixtureSessionCatalog implements SessionCatalog {
       },
     );
     this.#messages.set(input.sessionId, messages);
+  }
+
+  rewindConversation(sessionId: string, userMessageId: string): void {
+    const messages = this.#messages.get(sessionId) ?? [];
+    const target = messages.findIndex(
+      (message) => message.type === "user" && message.id === userMessageId,
+    );
+    if (target === -1) {
+      throw new Error("Fixture rewind target does not exist");
+    }
+    this.#messages.set(
+      sessionId,
+      messages.slice(0, target + 1).map((message) => ({ ...message })),
+    );
   }
 
   recordElicitation(

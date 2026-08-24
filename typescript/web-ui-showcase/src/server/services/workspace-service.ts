@@ -74,29 +74,14 @@ export class WorkspaceService {
 
   async register(path: string, commandId?: string): Promise<WorkspaceView> {
     const canonicalPath = await validateWorkspacePath(path);
-    const workspaces = await this.#repository.list();
-    const existing = workspaces.find(
-      (workspace) => workspace.path === canonicalPath,
-    );
-    if (existing !== undefined) {
-      return this.withWorkspace(existing.id, async (view) => {
-        this.#journal.publish(
-          { type: "workspace.upserted", payload: view },
-          commandId === undefined ? {} : { commandId },
-        );
-        return view;
-      });
-    }
-
     const timestamp = this.#now();
-    const workspace: StoredWorkspace = {
+    const workspace = await this.#repository.registerOrGetByPath({
       id: this.#createUuid(),
       displayName: basename(canonicalPath) || canonicalPath,
       path: canonicalPath,
       createdAt: timestamp,
       updatedAt: timestamp,
-    };
-    await this.#repository.upsert(workspace);
+    });
     const view = toView(workspace);
     this.#journal.publish(
       { type: "workspace.upserted", payload: view },

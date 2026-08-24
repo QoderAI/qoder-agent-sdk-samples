@@ -12,6 +12,41 @@ import { createSessionCatalog } from "../../src/server/sdk/session-catalog.js";
 
 const skipMessage =
   "SKIP real SDK smoke: configure qodercli authentication or QODER_PERSONAL_ACCESS_TOKEN.";
+const initializationDeadlineMs = 30_000;
+const firstResultDeadlineMs = 120_000;
+const resumeDeadlineMs = 30_000;
+const closeDeadlineMs = 15_000;
+const cleanupDeadlineMs = 15_000;
+
+async function withDeadline<T>(
+  label: string,
+  milliseconds: number,
+  operation: () => Promise<T>,
+): Promise<T> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_resolve, reject) => {
+    timeout = setTimeout(() => {
+      reject(new Error(`${label} exceeded its ${milliseconds} ms deadline.`));
+    }, milliseconds);
+  });
+  try {
+    return await Promise.race([operation(), deadline]);
+  } finally {
+    if (timeout !== undefined) clearTimeout(timeout);
+  }
+}
+
+async function attemptCleanup(
+  label: string,
+  operation: () => Promise<unknown>,
+): Promise<void> {
+  try {
+    await withDeadline(label, cleanupDeadlineMs, operation);
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    console.warn(`WARN real SDK smoke cleanup: ${detail}`);
+  }
+}
 
 function authNotConfigured(error: unknown): boolean {
   if (typeof error !== "object" || error === null) return false;
@@ -54,7 +89,6 @@ const config: ServerConfig = {
   eventCapacity: 100,
   enableCheckpoints: true,
   rawEvents: false,
-  devOrigin: "http://127.0.0.1:5173",
   allowedOrigins: new Set(["http://127.0.0.1:5173"]),
 };
 const journal = new EventJournal({ epoch: randomUUID(), capacity: 100 });
@@ -75,8 +109,41 @@ async function initialize(input: InputQueue, resume: boolean): Promise<QueryPort
     ...(resume ? { resumeSessionId: sessionId } : { newSessionId: sessionId }),
   });
   activeQuery = query;
-  await query.initializationResult();
+  await withDeadline(
+    resume ? "Real SDK Session resume" : "Real SDK initialization",
+    resume ? resumeDeadlineMs : initializationDeadlineMs,
+    () => query.initializationResult(),
+  );
   return query;
+}
+
+async function closeQuery(query: QueryPort, label: string): Promise<void> {
+  await withDeadline(label, closeDeadlineMs, () => query.close());
+  if (activeQuery === query) activeQuery = undefined;
+}
+
+async function waitForExpectedResult(query: QueryPort): Promise<string> {
+  return withDeadline(
+    "Real SDK first successful result",
+    firstResultDeadlineMs,
+    async () => {
+      for await (const message of query) {
+        if (
+          message.type === "result" &&
+          message.subtype === "success" &&
+          message.result.includes("WEB_UI_SMOKE_OK")
+        ) {
+          return message.session_id;
+        }
+        if (message.type === "result" && message.subtype !== "success") {
+          throw new Error(
+            `Real SDK smoke failed with result subtype ${message.subtype}.`,
+          );
+        }
+      }
+      throw new Error("Real SDK smoke ended without the expected marker.");
+    },
+  );
 }
 
 try {
@@ -87,24 +154,8 @@ try {
     priority: "next",
     shouldQuery: true,
   });
-  let succeeded = false;
-  for await (const message of query) {
-    if (
-      message.type === "result" &&
-      message.subtype === "success" &&
-      message.result.includes("WEB_UI_SMOKE_OK")
-    ) {
-      resultSessionId = message.session_id;
-      succeeded = true;
-      break;
-    }
-    if (message.type === "result" && message.subtype !== "success") {
-      throw new Error(`Real SDK smoke failed with result subtype ${message.subtype}.`);
-    }
-  }
-  if (!succeeded) throw new Error("Real SDK smoke ended without the expected marker.");
-  await query.close();
-  activeQuery = undefined;
+  resultSessionId = await waitForExpectedResult(query);
+  await closeQuery(query, "Real SDK initial Query close");
 
   if (resultSessionId !== sessionId) {
     throw new Error("Real SDK smoke returned a different Session identifier than requested.");
@@ -123,8 +174,7 @@ try {
   }
 
   const resumed = await initialize(new InputQueue(), true);
-  await resumed.close();
-  activeQuery = undefined;
+  await closeQuery(resumed, "Real SDK resumed Query close");
   console.log("PASS real SDK smoke: create, persist, resume, and close.");
 } catch (error) {
   if (authNotConfigured(error)) {
@@ -133,7 +183,19 @@ try {
     throw error;
   }
 } finally {
-  await activeQuery?.close().catch(() => undefined);
-  await catalog.delete(project, sessionId).catch(() => undefined);
-  await rm(project, { recursive: true, force: true });
+  const queryToClose = activeQuery;
+  if (queryToClose !== undefined) {
+    await attemptCleanup(
+      "Real SDK active Query cleanup",
+      () => queryToClose.close(),
+    );
+  }
+  await attemptCleanup(
+    "Real SDK catalog cleanup",
+    () => catalog.delete(project, sessionId),
+  );
+  await attemptCleanup(
+    "Real SDK temporary directory cleanup",
+    () => rm(project, { recursive: true, force: true }),
+  );
 }

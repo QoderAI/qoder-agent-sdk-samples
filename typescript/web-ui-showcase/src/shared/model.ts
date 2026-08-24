@@ -90,7 +90,6 @@ const assistantConversationItemSchema = z
     status: z
       .enum(["streaming", "complete", "interrupted", "failed"])
       .default("complete"),
-    streaming: z.boolean().optional(),
   })
   .strict();
 
@@ -117,15 +116,6 @@ const toolConversationItemSchema = z
   })
   .strict();
 
-const resultConversationItemSchema = z
-  .object({
-    ...conversationBase,
-    kind: z.literal("result"),
-    success: z.boolean(),
-    text: z.string().optional(),
-  })
-  .strict();
-
 const progressConversationItemSchema = z
   .object({
     ...conversationBase,
@@ -143,23 +133,12 @@ const errorConversationItemSchema = z
   })
   .strict();
 
-const rawConversationItemSchema = z
-  .object({
-    ...conversationBase,
-    kind: z.literal("raw"),
-    messageType: z.string().min(1),
-    payload: z.unknown(),
-  })
-  .strict();
-
 export const conversationItemSchema = z.discriminatedUnion("kind", [
   userConversationItemSchema,
   assistantConversationItemSchema,
   toolConversationItemSchema,
-  resultConversationItemSchema,
   progressConversationItemSchema,
   errorConversationItemSchema,
-  rawConversationItemSchema,
 ]);
 export type ConversationItem = z.infer<typeof conversationItemSchema>;
 

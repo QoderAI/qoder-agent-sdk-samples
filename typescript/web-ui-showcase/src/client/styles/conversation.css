@@ -3,7 +3,11 @@
 .message-card, .interaction-card { margin-bottom: 16px; }
 .message-card { padding: 0; }
 .message-card p { margin: 4px 0; line-height: 1.65; white-space: pre-wrap; }
-.message-card.user { width: fit-content; max-width: 78%; margin-right: 0; border-radius: 14px; padding: 9px 13px; background: var(--bg-selected); }
+.message-card.user { position: relative; width: fit-content; max-width: 78%; margin-right: 0; border-radius: 14px; padding: 9px 13px; background: var(--bg-selected); }
+.message-actions { display: flex; justify-content: flex-end; margin: 5px -4px -4px; }
+.message-action { border: 0; border-radius: 6px; padding: 3px 5px; background: transparent; color: var(--label-secondary); font: inherit; font-size: 11px; cursor: pointer; }
+.message-action:hover { background: var(--bg-hover); color: var(--business-primary); }
+.message-action:focus-visible { outline: 2px solid var(--business-primary); outline-offset: 1px; }
 .message-card.assistant { max-width: 100%; }
 .message-card.progress { border-radius: 8px; padding: 8px 10px; color: var(--label-secondary); background: var(--bg-muted); }
 .message-card.error { border: 1px solid #efc6ca; border-radius: 10px; padding: 10px 12px; background: var(--danger-surface); }

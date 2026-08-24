@@ -42,6 +42,7 @@ describe("restart hydration", () => {
     };
     const repository: WorkspaceRepository = {
       list: async () => [workspace],
+      registerOrGetByPath: async () => workspace,
       upsert: async () => undefined,
       remove: async () => undefined,
     };

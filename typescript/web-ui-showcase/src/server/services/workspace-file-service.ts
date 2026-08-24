@@ -43,6 +43,10 @@ type RootSearch = {
   truncated: boolean;
 };
 
+type ScanBudget = {
+  scannedEntries: number;
+};
+
 function isWithinRoot(root: string, candidate: string): boolean {
   const pathFromRoot = relative(root, candidate);
   return pathFromRoot === "" || (
@@ -73,9 +77,13 @@ export class WorkspaceFileService {
   async search(
     sessionId: string,
     query: string,
+    signal?: AbortSignal,
   ): Promise<WorkspaceFileSearchResult> {
+    signal?.throwIfAborted();
     const resolved = await this.#resolveSession(sessionId);
+    signal?.throwIfAborted();
     const workspace = await this.#workspaces.require(resolved.workspaceId);
+    signal?.throwIfAborted();
     const roots: FileRoot[] = [
       {
         absolute: workspace.path,
@@ -84,15 +92,23 @@ export class WorkspaceFileService {
       },
       ...[...new Set(resolved.allowedDirectories)]
         .filter((path) => path !== workspace.path)
+        .sort((left, right) => left.localeCompare(right))
         .map((path) => ({
           absolute: path,
           rootLabel: basename(path) || path,
           source: "allowed" as const,
         })),
     ];
-    const searched = await Promise.all(
-      roots.map((root) => this.#searchRoot(root, query)),
-    );
+    const budget: ScanBudget = { scannedEntries: 0 };
+    const searched: RootSearch[] = [];
+    for (const root of roots) {
+      signal?.throwIfAborted();
+      if (budget.scannedEntries >= this.#limits.maxEntries) {
+        searched.push({ items: [], truncated: true });
+        break;
+      }
+      searched.push(await this.#searchRoot(root, query, budget, signal));
+    }
     const normalizedQuery = query.toLocaleLowerCase();
     const items = searched.flatMap((result) => result.items);
     items.sort((left, right) => {
@@ -118,36 +134,45 @@ export class WorkspaceFileService {
     };
   }
 
-  async #searchRoot(root: FileRoot, query: string): Promise<RootSearch> {
+  async #searchRoot(
+    root: FileRoot,
+    query: string,
+    budget: ScanBudget,
+    signal?: AbortSignal,
+  ): Promise<RootSearch> {
     const directories = [
       { absolute: root.absolute, relative: "", depth: 0 },
     ];
     const matches: string[] = [];
     const normalizedQuery = query.toLocaleLowerCase();
-    let scannedEntries = 0;
     let truncated = false;
     let scanLimitReached = false;
 
     while (directories.length > 0 && !scanLimitReached) {
+      signal?.throwIfAborted();
       const directory = directories.shift();
       if (directory === undefined) break;
       let canonicalDirectory: string;
       let entries;
       try {
         canonicalDirectory = await realpath(directory.absolute);
+        signal?.throwIfAborted();
         if (!isWithinRoot(root.absolute, canonicalDirectory)) continue;
         entries = await readdir(canonicalDirectory, { withFileTypes: true });
       } catch {
+        signal?.throwIfAborted();
         continue;
       }
+      signal?.throwIfAborted();
       entries.sort((left, right) => left.name.localeCompare(right.name));
       for (const entry of entries) {
-        if (scannedEntries >= this.#limits.maxEntries) {
+        signal?.throwIfAborted();
+        if (budget.scannedEntries >= this.#limits.maxEntries) {
           truncated = true;
           scanLimitReached = true;
           break;
         }
-        scannedEntries += 1;
+        budget.scannedEntries += 1;
         if (entry.isSymbolicLink()) continue;
         const relative =
           directory.relative.length === 0

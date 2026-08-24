@@ -3,7 +3,72 @@ import type { McpServerView } from "../../shared/model.js";
 import { AppError } from "../errors/app-error.js";
 import type { EventJournal } from "../realtime/event-journal.js";
 import type { QueryPort } from "./query-port.js";
+import { boundedErrorText } from "./error-text-redact.js";
+import {
+  redactForBrowser,
+  safeDiagnosticRecord,
+} from "./redact.js";
 import type { SessionRegistry } from "./session-registry.js";
+
+const MCP_TOOL_LIMIT = 100;
+const MCP_TOOL_NAME_LIMIT = 256;
+const MCP_TOOL_DESCRIPTION_LIMIT = 1_024;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function metadataRecord(value: unknown): Record<string, unknown> {
+  const projected = redactForBrowser(value);
+  return isRecord(projected)
+    ? safeDiagnosticRecord(projected)
+    : safeDiagnosticRecord({
+        unavailable: true,
+        projected,
+      });
+}
+
+function toolRecord(
+  value: unknown,
+  index: number,
+): Record<string, unknown> {
+  if (!isRecord(value)) {
+    return { name: `MCP tool ${index + 1}`, metadataUnavailable: true };
+  }
+  const projected = safeDiagnosticRecord(value);
+  const name = typeof projected.name === "string"
+    ? boundedErrorText(projected.name, MCP_TOOL_NAME_LIMIT).trim()
+    : "";
+  const description = typeof projected.description === "string"
+    ? boundedErrorText(projected.description, MCP_TOOL_DESCRIPTION_LIMIT).trim()
+    : undefined;
+  return {
+    ...projected,
+    name: name || `MCP tool ${index + 1}`,
+    ...(description === undefined ? {} : { description }),
+  };
+}
+
+function toolRecords(value: unknown): Array<Record<string, unknown>> {
+  const projected = redactForBrowser(value);
+  if (!Array.isArray(projected)) {
+    return [{
+      name: "MCP tool metadata unavailable",
+      metadata: metadataRecord(projected),
+    }];
+  }
+  if (projected.length <= MCP_TOOL_LIMIT) {
+    return projected.map(toolRecord);
+  }
+  const visible = projected
+    .slice(0, MCP_TOOL_LIMIT - 1)
+    .map(toolRecord);
+  visible.push({
+    name: "Additional MCP tools omitted",
+    omittedTools: projected.length - visible.length,
+  });
+  return visible;
+}
 
 function statusView(
   sessionId: string,
@@ -21,20 +86,10 @@ function statusView(
     status: normalized,
     ...(status.serverInfo === undefined
       ? {}
-      : { serverInfo: { ...status.serverInfo } }),
+      : { serverInfo: metadataRecord(status.serverInfo) }),
     ...(status.tools === undefined
       ? {}
-      : {
-          tools: status.tools.map((tool) => ({
-            name: tool.name,
-            ...(tool.description === undefined
-              ? {}
-              : { description: tool.description }),
-            ...(tool.annotations === undefined
-              ? {}
-              : { annotations: { ...tool.annotations } }),
-          })),
-        }),
+      : { tools: toolRecords(status.tools) }),
     ...(status.status !== "failed"
       ? {}
       : {

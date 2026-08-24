@@ -16,6 +16,8 @@ export function createShowcaseHooks(input: {
   const now = input.now ?? (() => new Date().toISOString());
   const observe: HookCallback = async (hookInput): Promise<HookJSONOutput> => {
     const observation: Record<string, unknown> = {
+      source: "callback",
+      phase: "observation",
       event: hookInput.hook_event_name,
       occurredAt: now(),
     };

@@ -38,6 +38,7 @@ import { ComposerDrafts } from "./composer-drafts.js";
 import { readContextSummary } from "./context-summary.js";
 
 type Accepted = { commandId: string };
+const fileSuggestionDebounceMs = 200;
 type FileSuggestionState =
   | { status: "idle"; items: []; truncated: false }
   | { status: "loading"; items: []; truncated: false }
@@ -82,6 +83,7 @@ type CommonComposerProps = {
   searchWorkspaceFiles?: (
     sessionId: string,
     query: string,
+    signal?: AbortSignal,
   ) => Promise<WorkspaceFileSearchResult>;
 };
 
@@ -190,22 +192,31 @@ export function PromptComposer(props: PromptComposerProps): JSX.Element {
       return;
     }
     const sequence = ++requestSequence.current;
+    const controller = new AbortController();
     let active = true;
     setFileState({ status: "loading", items: [], truncated: false });
-    void props
-      .searchWorkspaceFiles(sessionId, activeQuery.query)
-      .then(
-        (result) => {
-          if (!active || requestSequence.current !== sequence) return;
-          setFileState({ status: "ready", ...result });
-        },
-        () => {
-          if (!active || requestSequence.current !== sequence) return;
-          setFileState({ status: "failed", items: [], truncated: false });
-        },
-      );
+    const timeout = window.setTimeout(() => {
+      void props
+        .searchWorkspaceFiles?.(sessionId, activeQuery.query, controller.signal)
+        .then(
+          (result) => {
+            if (!active || requestSequence.current !== sequence) return;
+            setFileState({ status: "ready", ...result });
+          },
+          () => {
+            if (
+              !active ||
+              controller.signal.aborted ||
+              requestSequence.current !== sequence
+            ) return;
+            setFileState({ status: "failed", items: [], truncated: false });
+          },
+        );
+    }, fileSuggestionDebounceMs);
     return () => {
       active = false;
+      window.clearTimeout(timeout);
+      controller.abort();
     };
   }, [
     activeQuery?.kind,

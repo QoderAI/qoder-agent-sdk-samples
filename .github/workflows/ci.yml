@@ -20,6 +20,8 @@ jobs:
           cache-dependency-path: typescript/package-lock.json
       - run: npm ci
         working-directory: typescript
+      - run: npx playwright install --with-deps chromium
+        working-directory: typescript
       - run: npm run check --workspaces
         working-directory: typescript
 

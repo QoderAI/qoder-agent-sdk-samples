@@ -1,5 +1,7 @@
 import {
   commandAcceptedSchema,
+  type CheckpointExecuteCommand,
+  type CheckpointPreviewCommand,
   type InteractionResponse,
   type SelectablePermissionMode,
   type SendMessageInput,
@@ -52,11 +54,13 @@ export class ApiClient {
   searchWorkspaceFiles(
     sessionId: string,
     query: string,
+    signal?: AbortSignal,
   ): Promise<WorkspaceFileSearchResult> {
     const params = new URLSearchParams({ q: query });
     return this.#read(
       `/api/sessions/${sessionId}/files?${params.toString()}`,
       workspaceFileSearchResultSchema,
+      signal === undefined ? undefined : { signal },
     );
   }
   startSession(input: StartSessionCommand): Promise<SessionStarted> {
@@ -75,6 +79,26 @@ export class ApiClient {
     input: SendMessageInput,
   ): Promise<Accepted> {
     return this.#accepted(`/api/sessions/${sessionId}/messages`, "POST", input);
+  }
+  previewCheckpoint(
+    sessionId: string,
+    input: CheckpointPreviewCommand,
+  ): Promise<Accepted> {
+    return this.#accepted(
+      `/api/sessions/${sessionId}/checkpoints/preview`,
+      "POST",
+      input,
+    );
+  }
+  executeCheckpoint(
+    sessionId: string,
+    input: CheckpointExecuteCommand,
+  ): Promise<Accepted> {
+    return this.#accepted(
+      `/api/sessions/${sessionId}/checkpoints/execute`,
+      "POST",
+      input,
+    );
   }
   cancelMessage(sessionId: string, messageUuid: string): Promise<Accepted> {
     return this.#accepted(

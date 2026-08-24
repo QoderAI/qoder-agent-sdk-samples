@@ -58,7 +58,26 @@ function setup(options: { omitVersions?: boolean } = {}) {
         skills: ["review"],
         agents: [{ name: "general" }],
         plugins: [{ name: "fixture-plugin" }],
-        hooks: [{ event: "PreToolUse", input: "[REDACTED]" }],
+        hooks: [
+          {
+            source: "callback",
+            phase: "observation",
+            event: "PreToolUse",
+            input: "[REDACTED]",
+          },
+          {
+            source: "sdk-event",
+            phase: "started",
+            event: "PreToolUse",
+            hookId: "hook-1",
+          },
+          {
+            source: "sdk-event",
+            phase: "completed",
+            event: "PreToolUse",
+            hookId: "hook-1",
+          },
+        ],
         rawEvents: [{ messageType: "system.init", payload: "[REDACTED]" }],
         ...(options.omitVersions === true
           ? {}
@@ -100,6 +119,8 @@ function setup(options: { omitVersions?: boolean } = {}) {
     pickAndAddDirectory: vi.fn(accepted),
     refreshRuntime: vi.fn(accepted),
     refreshContext: vi.fn(accepted),
+    previewCheckpoint: vi.fn(accepted),
+    executeCheckpoint: vi.fn(accepted),
     reloadPlugins: vi.fn(accepted),
     generateTitle: vi.fn(accepted),
     getSubagentTranscript: vi.fn(async () => ({ status: "waiting" as const })),
@@ -126,7 +147,11 @@ describe("SDK console", () => {
     const dialog = screen.getByRole("dialog", { name: "SDK 控制台" });
     expect(dialog).toBeVisible();
     expect(within(dialog).getByRole("heading", { name: "Hooks" })).toBeVisible();
-    expect(within(dialog).getByText("PreToolUse")).toBeVisible();
+    expect(within(dialog).getAllByText("PreToolUse")).toHaveLength(3);
+    expect(within(dialog).getByText("callback · observation")).toBeVisible();
+    expect(within(dialog).getByText("sdk-event · started")).toBeVisible();
+    expect(within(dialog).getByText("sdk-event · completed")).toBeVisible();
+    expect(within(dialog).getAllByText("Hook ID hook-1")).toHaveLength(2);
     expect(within(dialog).getByText("SDK 1.2.3")).toBeVisible();
     expect(within(dialog).getByText("CLI 4.5.6")).toBeVisible();
     expect(within(dialog).getByText("The SDK runtime reported a safe error.")).toBeVisible();

@@ -40,7 +40,13 @@ export type CommandOwner =
     }
   | {
       surface: "conversation";
-      control: "send" | "stop" | "cancel" | "context";
+      control:
+        | "send"
+        | "stop"
+        | "cancel"
+        | "context"
+        | "checkpoint-preview"
+        | "checkpoint-execute";
       sessionId: string;
     }
   | {

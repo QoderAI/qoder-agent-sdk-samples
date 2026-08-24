@@ -114,6 +114,93 @@ describe("MCP lifecycle", () => {
     expect(input.list()).toEqual([]);
   });
 
+  it("redacts and bounds browser-facing MCP metadata", async () => {
+    const journal = new EventJournal({ epoch: "epoch-mcp-metadata", capacity: 100 });
+    const registry = new SessionRegistry();
+    const mcp = new McpService({
+      journal,
+      registry,
+      restartSession: vi.fn(async () => undefined),
+    });
+    const tools = Array.from({ length: 120 }, (_, index) => ({
+      name: `tool-${index}`,
+      description: index === 0
+        ? [
+            "Inspect a repository.",
+            "Authorization: Bearer mcp-description-secret",
+            "    at inspect (/private/mcp-description-stack.ts:12:4)",
+          ].join("\n")
+        : `Tool ${index}`,
+      annotations: {
+        readOnlyHint: true,
+        apiKey: `mcp-annotation-secret-${index}`,
+      },
+    }));
+    const query = {
+      mcpServerStatus: vi.fn(async () => [{
+        name: "metadata-server",
+        status: "connected",
+        serverInfo: {
+          name: "fixture",
+          version: "1.0.0",
+          accessToken: "mcp-server-info-secret",
+        },
+        tools,
+      }]),
+    } as unknown as QueryPort;
+
+    const [view] = await mcp.preflight(sessionId, query);
+    expect(view?.serverInfo).toMatchObject({
+      name: "fixture",
+      accessToken: "[REDACTED]",
+    });
+    expect(view?.tools).toHaveLength(100);
+    expect(view?.tools?.[0]).toMatchObject({
+      name: "tool-0",
+      description: "Inspect a repository.",
+      annotations: { apiKey: "[REDACTED]" },
+    });
+    expect(view?.tools?.at(-1)).toMatchObject({
+      name: "Additional MCP tools omitted",
+      omittedTools: 21,
+    });
+    const serialized = JSON.stringify(view);
+    expect(serialized).not.toContain("mcp-description-secret");
+    expect(serialized).not.toContain("mcp-description-stack");
+    expect(serialized).not.toContain("mcp-server-info-secret");
+    expect(serialized).not.toContain("mcp-annotation-secret");
+  });
+
+  it("uses a bounded fallback for malformed MCP metadata", async () => {
+    const journal = new EventJournal({ epoch: "epoch-mcp-malformed", capacity: 100 });
+    const registry = new SessionRegistry();
+    const mcp = new McpService({
+      journal,
+      registry,
+      restartSession: vi.fn(async () => undefined),
+    });
+    const circular: unknown[] = [];
+    circular.push(circular);
+    const query = {
+      mcpServerStatus: vi.fn(async () => [{
+        name: "malformed-server",
+        status: "connected",
+        tools: circular,
+      }]),
+    } as unknown as QueryPort;
+
+    await expect(mcp.preflight(sessionId, query)).resolves.toMatchObject([
+      {
+        tools: [{
+          name: "MCP tool 1",
+          metadataUnavailable: true,
+        }],
+      },
+    ]);
+    const serialized = JSON.stringify(mcp.snapshot());
+    expect(new TextEncoder().encode(serialized).length).toBeLessThan(64 * 1_024);
+  });
+
   it("supports silent OAuth, user-action URLs, callbacks, and restart reconnect", async () => {
     const { fake, journal, mcp, restartSession } = await setup();
 

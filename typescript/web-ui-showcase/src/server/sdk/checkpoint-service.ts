@@ -8,13 +8,19 @@ import { AppError } from "../errors/app-error.js";
 import type { EventJournal } from "../realtime/event-journal.js";
 import type { SessionCatalog } from "../services/session-catalog-port.js";
 import { projectHistory } from "./history-projector.js";
+import type { SessionController } from "./session-controller.js";
 import type { SessionRegistry } from "./session-registry.js";
 
 const previewLifetimeMs = 5 * 60 * 1_000;
 
 type ExecutionResult = {
-  status: "success" | "partial" | "rejected";
+  status: "success" | "partial";
   failedFiles: Array<{ path: string; error: string }>;
+};
+
+type StoredPreview = {
+  view: CheckpointPreviewView;
+  revision: number;
 };
 
 /** Requires a recent SDK dry run before any file or conversation rewind. */
@@ -25,7 +31,7 @@ export class CheckpointService {
   readonly #getSession: (sessionId: string) => { cwd: string } | undefined;
   readonly #createUuid: () => string;
   readonly #now: () => Date;
-  readonly #previews = new Map<string, CheckpointPreviewView>();
+  readonly #previews = new Map<string, StoredPreview>();
 
   constructor(options: {
     registry: SessionRegistry;
@@ -47,23 +53,52 @@ export class CheckpointService {
     sessionId: string,
     input: CheckpointPreviewCommand,
   ): Promise<CheckpointPreviewView> {
-    return this.#registry.runGuarded(sessionId, () =>
-      this.#previewUnlocked(sessionId, input));
+    this.#registry.assertNoPendingMutation(sessionId);
+    return this.#registry.runGuarded(sessionId, async () => {
+      this.#registry.assertNoPendingMutation(sessionId);
+      const controller = this.#controller(sessionId);
+      this.#requireIdle(controller);
+      const revision = controller.transcriptRevision();
+      const view = await this.#previewWithQuery(controller, input);
+      if (controller.transcriptRevision() !== revision) {
+        throw this.#stalePreview();
+      }
+      this.#registry.assertNoPendingMutation(sessionId);
+      const timestamp = this.#now();
+      const preview: CheckpointPreviewView = {
+        id: this.#createUuid(),
+        sessionId,
+        userMessageId: input.userMessageId,
+        scope: input.scope,
+        expiresAt: new Date(
+          timestamp.getTime() + previewLifetimeMs,
+        ).toISOString(),
+        ...view,
+      };
+      this.#previews.set(preview.id, { view: preview, revision });
+      this.#journal.publish(
+        { type: "checkpoint.previewed", payload: preview },
+        { sessionId },
+      );
+      return preview;
+    });
   }
 
-  async #previewUnlocked(
-    sessionId: string,
+  async #previewWithQuery(
+    controller: SessionController,
     input: CheckpointPreviewCommand,
-  ): Promise<CheckpointPreviewView> {
-    const controller = this.#controller(sessionId);
+  ): Promise<
+    Omit<
+      CheckpointPreviewView,
+      "id" | "sessionId" | "userMessageId" | "scope" | "expiresAt"
+    >
+  > {
     const query = controller.query();
-    const timestamp = this.#now();
-    let view: Omit<CheckpointPreviewView, "id" | "sessionId" | "userMessageId" | "scope" | "expiresAt">;
     if (input.scope === "files") {
       const result = await query.rewindFiles(input.userMessageId, {
         dryRun: true,
       });
-      view = {
+      return {
         canRewind: result.canRewind,
         status: result.canRewind ? "ready" : "rejected",
         filesChanged: result.filesChanged ?? [],
@@ -80,51 +115,37 @@ export class CheckpointService {
               },
             }),
       };
-    } else {
-      this.#requireFullRewind(controller.capabilities());
-      const result = await query.rewind(input.userMessageId, {
-        scope: input.scope,
-        dryRun: true,
-      });
-      view = {
-        canRewind: result.status === "ready",
-        status: result.status,
-        filesChanged: result.filesChanged ?? [],
-        insertions: result.insertions ?? 0,
-        deletions: result.deletions ?? 0,
-        failedFiles: result.failedFiles ?? [],
-        ...(result.status !== "rejected" || result.error === undefined
-          ? {}
-          : {
-              error: {
-                code: "CHECKPOINT_REWIND_REJECTED",
-                message: "The SDK rejected the Session rewind preview.",
-                retryable: false,
-              },
-            }),
-      };
     }
-    const preview: CheckpointPreviewView = {
-      id: this.#createUuid(),
-      sessionId,
-      userMessageId: input.userMessageId,
+
+    this.#requireFullRewind(controller.capabilities());
+    const result = await query.rewind(input.userMessageId, {
       scope: input.scope,
-      expiresAt: new Date(timestamp.getTime() + previewLifetimeMs).toISOString(),
-      ...view,
+      dryRun: true,
+    });
+    return {
+      canRewind: result.status === "ready",
+      status: result.status,
+      filesChanged: result.filesChanged ?? [],
+      insertions: result.insertions ?? 0,
+      deletions: result.deletions ?? 0,
+      failedFiles: result.failedFiles ?? [],
+      ...(result.status !== "rejected" || result.error === undefined
+        ? {}
+        : {
+            error: {
+              code: "CHECKPOINT_REWIND_REJECTED",
+              message: "The SDK rejected the Session rewind preview.",
+              retryable: false,
+            },
+          }),
     };
-    this.#previews.set(preview.id, preview);
-    this.#journal.publish(
-      { type: "checkpoint.previewed", payload: preview },
-      { sessionId },
-    );
-    return preview;
   }
 
   async execute(
     sessionId: string,
     input: CheckpointExecuteCommand,
   ): Promise<void> {
-    await this.#registry.runGuarded(sessionId, () =>
+    await this.#registry.runMutation(sessionId, () =>
       this.#executeUnlocked(sessionId, input));
   }
 
@@ -133,7 +154,8 @@ export class CheckpointService {
     input: CheckpointExecuteCommand,
   ): Promise<void> {
     const controller = this.#controller(sessionId);
-    const preview = this.#consume(sessionId, input);
+    this.#requireIdle(controller);
+    const preview = this.#consume(sessionId, input, controller);
     let result: ExecutionResult;
     if (input.scope === "files") {
       const executed = await controller.query().rewindFiles(input.userMessageId);
@@ -154,6 +176,7 @@ export class CheckpointService {
         failedFiles: executed.failedFiles ?? [],
       };
     }
+    controller.bumpTranscriptRevision();
     const session = this.#getSession(sessionId);
     if (session === undefined) {
       throw new AppError({
@@ -189,18 +212,22 @@ export class CheckpointService {
 
   previews(sessionId?: string): CheckpointPreviewView[] {
     this.#removeExpired();
-    return [...this.#previews.values()].filter(
-      (preview) => sessionId === undefined || preview.sessionId === sessionId,
-    );
+    return [...this.#previews.values()]
+      .map((stored) => stored.view)
+      .filter(
+        (preview) => sessionId === undefined || preview.sessionId === sessionId,
+      );
   }
 
   clearSession(sessionId: string): void {
-    for (const preview of this.previews(sessionId)) {
-      this.#remove(preview);
+    for (const stored of [...this.#previews.values()]) {
+      if (stored.view.sessionId === sessionId) {
+        this.#remove(stored.view);
+      }
     }
   }
 
-  #controller(sessionId: string) {
+  #controller(sessionId: string): SessionController {
     const controller = this.#registry.get(sessionId);
     if (controller === undefined) {
       throw new AppError({
@@ -213,13 +240,28 @@ export class CheckpointService {
     return controller;
   }
 
+  #requireIdle(controller: SessionController): void {
+    const lifecycle = controller.lifecycle();
+    if (lifecycle.phase !== "idle" || lifecycle.awaitingUser) {
+      throw new AppError({
+        code: "CHECKPOINT_SESSION_BUSY",
+        message: "Wait for the Session and any pending interaction before creating or applying a Checkpoint.",
+        status: 409,
+        retryable: true,
+      });
+    }
+  }
+
   #consume(
     sessionId: string,
     input: CheckpointExecuteCommand,
+    controller: SessionController,
   ): CheckpointPreviewView {
-    const preview = this.#previews.get(input.previewId);
+    const stored = this.#previews.get(input.previewId);
+    const preview = stored?.view;
     if (
       preview === undefined ||
+      stored?.revision !== controller.transcriptRevision() ||
       preview.sessionId !== sessionId ||
       preview.userMessageId !== input.userMessageId ||
       preview.scope !== input.scope ||
@@ -234,19 +276,21 @@ export class CheckpointService {
         retryable: false,
       });
     }
-    this.#remove(preview);
+    this.clearSession(sessionId);
     return preview;
   }
 
   #removeExpired(): void {
     const now = this.#now().getTime();
-    for (const preview of this.#previews.values()) {
-      if (now >= new Date(preview.expiresAt).getTime()) this.#remove(preview);
+    for (const stored of [...this.#previews.values()]) {
+      if (now >= new Date(stored.view.expiresAt).getTime()) {
+        this.#remove(stored.view);
+      }
     }
   }
 
   #remove(preview: CheckpointPreviewView): void {
-    this.#previews.delete(preview.id);
+    if (!this.#previews.delete(preview.id)) return;
     this.#journal.publish(
       {
         type: "checkpoint.removed",
@@ -265,6 +309,15 @@ export class CheckpointService {
         retryable: false,
       });
     }
+  }
+
+  #stalePreview(): AppError {
+    return new AppError({
+      code: "CHECKPOINT_PREVIEW_STALE",
+      message: "The Session changed while the Checkpoint preview was being created. Create a new preview.",
+      status: 409,
+      retryable: true,
+    });
   }
 
   #rejectedExecution(): AppError {

@@ -8,11 +8,13 @@ import {
 import type { QueryPort } from "../../../../src/server/sdk/query-port.js";
 import { SessionRuntimeState } from "../../../../src/server/sdk/session-runtime-state.js";
 import { createShowcaseHooks } from "../../../../src/server/sdk/hooks.js";
+import { projectHistory } from "../../../../src/server/sdk/history-projector.js";
 import { EventJournal } from "../../../../src/server/realtime/event-journal.js";
 import type {
   ConversationItem,
   TaskView,
 } from "../../../../src/shared/model.js";
+import type { HistoricalMessage } from "../../../../src/server/services/session-catalog-port.js";
 
 const sessionId = "00000000-0000-4000-8000-000000000601";
 
@@ -116,6 +118,8 @@ function createHarness(
     createId?: () => string;
     onSessionTitleChanged?: (title: string) => void;
     initialTasks?: TaskView[];
+    interruptReceipt?: Awaited<ReturnType<QueryPort["interrupt"]>>;
+    cancelResult?: boolean;
   } = {},
 ) {
   const output = new OutputChannel();
@@ -123,8 +127,8 @@ function createHarness(
     async () =>
       options.closeQuery?.(output) ?? output.end(),
   );
-  const interrupt = vi.fn(async () => undefined);
-  const cancelAsyncMessage = vi.fn(async () => true);
+  const interrupt = vi.fn(async () => options.interruptReceipt);
+  const cancelAsyncMessage = vi.fn(async () => options.cancelResult ?? true);
   const getContextUsage = vi.fn(
     options.getContextUsage ??
       (() => Promise.resolve(contextUsage(39))),
@@ -230,6 +234,40 @@ function conversationItems(journal: EventJournal): ConversationItem[] {
   return replay.events.flatMap((event) =>
     event.type === "conversation.item" ? [event.payload.item] : [],
   );
+}
+
+function semanticTranscript(items: ConversationItem[]): Array<Record<string, unknown>> {
+  const canonical = new Map<string, ConversationItem>();
+  for (const item of items) canonical.set(item.id, item);
+  const semantic: Array<Record<string, unknown>> = [];
+  for (const item of canonical.values()) {
+    switch (item.kind) {
+      case "user":
+        semantic.push({ kind: item.kind, text: item.text });
+        break;
+      case "assistant":
+        semantic.push({
+          kind: item.kind,
+          text: item.text,
+          status: item.status,
+        });
+        break;
+      case "tool":
+        semantic.push({
+          kind: item.kind,
+          toolUseId: item.toolUseId,
+          name: item.name,
+          lifecycle: item.lifecycle,
+          input: item.input,
+          result: item.result,
+        });
+        break;
+      case "progress":
+      case "error":
+        break;
+    }
+  }
+  return semantic;
 }
 
 function taskEvents(journal: EventJournal): Array<
@@ -464,6 +502,71 @@ describe("SessionController", () => {
     await harness.controller.close("test complete");
   });
 
+  it("uses SDK Session state as the lifecycle and delivery boundary", async () => {
+    const harness = createHarness();
+    await harness.controller.start();
+    const queued = harness.controller.send({
+      text: "Inspect",
+      priority: "next",
+      shouldQuery: true,
+    });
+    await harness.input[Symbol.asyncIterator]().next();
+    expect(harness.input.list()).toMatchObject([
+      { uuid: queued.uuid, state: "delivered" },
+    ]);
+
+    harness.output.push({
+      type: "system",
+      subtype: "session_state_changed",
+      state: "running",
+      uuid: "00000000-0000-4000-8000-000000000605",
+      session_id: sessionId,
+    } satisfies SDKMessage);
+    harness.output.push({
+      type: "result",
+      subtype: "success",
+      result: "Done",
+      uuid: "00000000-0000-4000-8000-000000000606",
+      session_id: sessionId,
+    } as unknown as SDKMessage);
+    await waitFor(
+      () =>
+        harness.runtimeState.snapshot(sessionId).rawEvents?.some(
+          (event) => event.messageType === "result.success",
+        ) === true,
+      "result was not observed",
+    );
+    expect(harness.controller.lifecycle().phase).toBe("running");
+    expect(harness.input.list()).toHaveLength(1);
+
+    harness.output.push({
+      type: "system",
+      subtype: "session_state_changed",
+      state: "requires_action",
+      uuid: "00000000-0000-4000-8000-000000000607",
+      session_id: sessionId,
+    } satisfies SDKMessage);
+    await waitFor(
+      () => harness.controller.lifecycle().awaitingUser,
+      "requires_action was not projected",
+    );
+    expect(harness.controller.lifecycle().phase).toBe("running");
+
+    harness.output.push({
+      type: "system",
+      subtype: "session_state_changed",
+      state: "idle",
+      uuid: "00000000-0000-4000-8000-000000000608",
+      session_id: sessionId,
+    } satisfies SDKMessage);
+    await waitFor(
+      () => harness.controller.lifecycle().phase === "idle",
+      "idle state was not projected",
+    );
+    expect(harness.input.list()).toEqual([]);
+    await harness.controller.close("test complete");
+  });
+
   it("loads Context after initialization without delaying Session startup", async () => {
     const context = deferred<ContextUsage>();
     const harness = createHarness({
@@ -688,6 +791,69 @@ describe("SessionController", () => {
     await harness.controller.close("test complete");
   });
 
+  it("removes delivered input only when SDK cancellation succeeds", async () => {
+    const accepted = createHarness({ cancelResult: true });
+    await accepted.controller.start();
+    const acceptedInput = accepted.controller.send({
+      text: "Cancel me",
+      priority: "next",
+      shouldQuery: true,
+    });
+    await accepted.input[Symbol.asyncIterator]().next();
+    await expect(
+      accepted.controller.cancelMessage(acceptedInput.uuid),
+    ).resolves.toBe(true);
+    expect(accepted.input.list()).toEqual([]);
+    await accepted.controller.close("test complete");
+
+    const rejected = createHarness({ cancelResult: false });
+    await rejected.controller.start();
+    const rejectedInput = rejected.controller.send({
+      text: "Keep me",
+      priority: "next",
+      shouldQuery: true,
+    });
+    await rejected.input[Symbol.asyncIterator]().next();
+    await expect(
+      rejected.controller.cancelMessage(rejectedInput.uuid),
+    ).resolves.toBe(false);
+    expect(rejected.input.list()).toMatchObject([
+      { uuid: rejectedInput.uuid, state: "delivered" },
+    ]);
+    await rejected.controller.close("test complete");
+  });
+
+  it("retains only UUIDs reported as still queued after interruption", async () => {
+    const firstUuid = "00000000-0000-4000-8000-000000000602";
+    const secondUuid = "00000000-0000-4000-8000-000000000603";
+    const harness = createHarness({
+      interruptReceipt: { still_queued: [secondUuid], cancelled: [] },
+    });
+    await harness.controller.start();
+    const first = harness.controller.send({
+      text: "Current",
+      priority: "now",
+      shouldQuery: true,
+    });
+    const second = harness.controller.send({
+      text: "Later",
+      priority: "later",
+      shouldQuery: true,
+    });
+    expect([first.uuid, second.uuid]).toEqual([firstUuid, secondUuid]);
+    const iterator = harness.input[Symbol.asyncIterator]();
+    await iterator.next();
+    await iterator.next();
+
+    await harness.controller.interrupt();
+
+    expect(harness.controller.lifecycle().phase).toBe("running");
+    expect(harness.input.list()).toMatchObject([
+      { uuid: secondUuid, state: "delivered" },
+    ]);
+    await harness.controller.close("test complete");
+  });
+
   it("merges stream deltas and a differently identified final message", async () => {
     const harness = createHarness();
     await harness.controller.start();
@@ -731,6 +897,155 @@ describe("SessionController", () => {
       text: "你好，我已完成。",
       status: "complete",
     });
+    await harness.controller.close("test complete");
+  });
+
+  it("keeps live and restored transcript semantics equivalent", async () => {
+    const harness = createHarness();
+    await harness.controller.start();
+    const userId = "00000000-0000-4000-8000-0000000006b1";
+    const assistantRequestId = "00000000-0000-4000-8000-0000000006b3";
+    const toolResultId = "00000000-0000-4000-8000-0000000006b4";
+    const assistantFinalId = "00000000-0000-4000-8000-0000000006b5";
+    const userMessage = {
+      role: "user" as const,
+      content: "Inspect README",
+    };
+    const assistantRequest = {
+      role: "assistant" as const,
+      content: [
+        { type: "text" as const, text: "I will inspect README." },
+        {
+          type: "tool_use" as const,
+          id: "tool-read",
+          name: "Read",
+          input: { file_path: "README.md", apiKey: "input-secret" },
+        },
+      ],
+    };
+    const toolResult = {
+      role: "user" as const,
+      content: [{
+        type: "tool_result" as const,
+        tool_use_id: "tool-read",
+        content: { text: "README loaded", accessToken: "result-secret" },
+      }],
+    };
+    const assistantFinal = {
+      role: "assistant" as const,
+      content: [{ type: "text" as const, text: "README is ready." }],
+    };
+
+    harness.output.push({
+      type: "user",
+      message: userMessage,
+      parent_tool_use_id: null,
+      isSynthetic: false,
+      uuid: userId,
+      session_id: sessionId,
+      timestamp: "2026-08-14T08:00:00.000Z",
+    } as SDKMessage);
+    for (const text of ["I will ", "inspect README."]) {
+      harness.output.push({
+        type: "stream_event",
+        event: {
+          type: "content_block_delta",
+          delta: { type: "text_delta", text },
+        },
+        parent_tool_use_id: null,
+        uuid: "00000000-0000-4000-8000-0000000006b2",
+        session_id: sessionId,
+      } as SDKMessage);
+    }
+    harness.output.push({
+      type: "assistant",
+      message: assistantRequest,
+      parent_tool_use_id: null,
+      uuid: assistantRequestId,
+      session_id: sessionId,
+    } as SDKMessage);
+    harness.output.push({
+      type: "user",
+      message: toolResult,
+      parent_tool_use_id: null,
+      isSynthetic: true,
+      uuid: toolResultId,
+      session_id: sessionId,
+    } as SDKMessage);
+    harness.output.push({
+      type: "assistant",
+      message: assistantFinal,
+      parent_tool_use_id: null,
+      uuid: assistantFinalId,
+      session_id: sessionId,
+    } as SDKMessage);
+    harness.output.push({
+      type: "result",
+      subtype: "success",
+      result: "README is ready.",
+      uuid: "00000000-0000-4000-8000-0000000006b6",
+      session_id: sessionId,
+    } as unknown as SDKMessage);
+
+    await waitFor(
+      () => semanticTranscript(conversationItems(harness.journal)).length === 4,
+      "live transcript did not settle",
+    );
+    const history: HistoricalMessage[] = [
+      {
+        type: "user",
+        id: userId,
+        sessionId,
+        message: userMessage,
+        parentToolUseId: null,
+        timestamp: "2026-08-14T08:00:00.000Z",
+      },
+      {
+        type: "assistant",
+        id: assistantRequestId,
+        sessionId,
+        message: assistantRequest,
+        parentToolUseId: null,
+        timestamp: "2026-08-14T08:00:01.000Z",
+      },
+      {
+        type: "user",
+        id: toolResultId,
+        sessionId,
+        message: toolResult,
+        parentToolUseId: null,
+        timestamp: "2026-08-14T08:00:01.250Z",
+      },
+      {
+        type: "assistant",
+        id: assistantFinalId,
+        sessionId,
+        message: assistantFinal,
+        parentToolUseId: null,
+        timestamp: "2026-08-14T08:00:02.000Z",
+      },
+    ];
+    const live = semanticTranscript(conversationItems(harness.journal));
+    const restored = semanticTranscript(projectHistory(history));
+
+    expect(live).toEqual(restored);
+    expect(live).toEqual([
+      { kind: "user", text: "Inspect README" },
+      {
+        kind: "assistant",
+        text: "I will inspect README.",
+        status: "complete",
+      },
+      {
+        kind: "tool",
+        toolUseId: "tool-read",
+        name: "Read",
+        lifecycle: "completed",
+        input: { file_path: "README.md", apiKey: "[REDACTED]" },
+        result: { text: "README loaded", accessToken: "[REDACTED]" },
+      },
+      { kind: "assistant", text: "README is ready.", status: "complete" },
+    ]);
     await harness.controller.close("test complete");
   });
 

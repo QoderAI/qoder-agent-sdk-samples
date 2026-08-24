@@ -417,6 +417,136 @@ describe("SDK message projection", () => {
     ]);
   });
 
+  it("projects SDK Session state changes as lifecycle actions", () => {
+    for (const state of ["running", "requires_action", "idle"] as const) {
+      const message = {
+        type: "system",
+        subtype: "session_state_changed",
+        state,
+        uuid: itemId,
+        session_id: sessionId,
+      } satisfies SDKMessage;
+      expect(projectSdkMessage(message, {
+        ...context,
+        includeRawEvents: false,
+      })).toEqual([{ type: "session.state", state }]);
+    }
+  });
+
+  it("normalizes SDK Hook lifecycle events with stable provenance", () => {
+    const messages = [
+      {
+        type: "system",
+        subtype: "hook_started",
+        hook_id: "hook-1",
+        hook_name: "observe-tool",
+        hook_event: "PreToolUse",
+        uuid: itemId,
+        session_id: sessionId,
+      },
+      {
+        type: "system",
+        subtype: "hook_progress",
+        hook_id: "hook-1",
+        hook_name: "observe-tool",
+        hook_event: "PreToolUse",
+        uuid: itemId,
+        session_id: sessionId,
+      },
+      {
+        type: "system",
+        subtype: "hook_response",
+        hook_id: "hook-1",
+        hook_name: "observe-tool",
+        hook_event: "PreToolUse",
+        outcome: "success",
+        uuid: itemId,
+        session_id: sessionId,
+      },
+    ] as unknown as SDKMessage[];
+
+    expect(messages.flatMap((message) =>
+      projectSdkMessage(message, {
+        ...context,
+        includeRawEvents: false,
+      })
+    )).toEqual([
+      {
+        type: "runtime.patch",
+        patch: {
+          hooks: [{
+            source: "sdk-event",
+            event: "PreToolUse",
+            phase: "started",
+            hookId: "hook-1",
+            hookName: "observe-tool",
+            occurredAt: "2026-08-14T08:00:00.000Z",
+          }],
+        },
+      },
+      {
+        type: "runtime.patch",
+        patch: {
+          hooks: [{
+            source: "sdk-event",
+            event: "PreToolUse",
+            phase: "progress",
+            hookId: "hook-1",
+            hookName: "observe-tool",
+            occurredAt: "2026-08-14T08:00:00.000Z",
+          }],
+        },
+      },
+      {
+        type: "runtime.patch",
+        patch: {
+          hooks: [{
+            source: "sdk-event",
+            event: "PreToolUse",
+            phase: "completed",
+            hookId: "hook-1",
+            hookName: "observe-tool",
+            outcome: "success",
+            occurredAt: "2026-08-14T08:00:00.000Z",
+          }],
+        },
+      },
+    ]);
+  });
+
+  it("redacts free-form permission denial messages", () => {
+    const message = {
+      type: "system",
+      subtype: "permission_denied",
+      tool_name: "Bash",
+      tool_use_id: "tool-bash",
+      message: [
+        "The command is not allowed.",
+        "Authorization: Bearer permission-secret",
+        "    at run (/private/permission-stack-secret.ts:12:4)",
+      ].join("\n"),
+      uuid: itemId,
+      session_id: sessionId,
+    } satisfies SDKMessage;
+
+    const projection = projectSdkMessage(message, {
+      ...context,
+      includeRawEvents: false,
+    });
+    expect(projection).toContainEqual({
+      type: "conversation.add",
+      item: expect.objectContaining({
+        kind: "error",
+        error: expect.objectContaining({
+          code: "TOOL_PERMISSION_DENIED",
+          message: expect.stringContaining("The command is not allowed."),
+        }),
+      }),
+    });
+    expect(JSON.stringify(projection)).not.toContain("permission-secret");
+    expect(JSON.stringify(projection)).not.toContain("permission-stack-secret");
+  });
+
   it("projects result completion and additive unknown events safely", () => {
     const result = {
       type: "result",

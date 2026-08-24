@@ -90,6 +90,7 @@ export type ProjectionAction =
   | { type: "task.remove"; taskId: string }
   | { type: "session.title-changed"; title: string }
   | { type: "runtime.patch"; patch: SessionRuntimePatch }
+  | { type: "session.state"; state: "idle" | "running" | "requires_action" }
   | { type: "turn.completed"; success: boolean; error?: WireError };
 
 export type ProjectionContext = {
@@ -242,6 +243,19 @@ function projectUser(
   return actions;
 }
 
+function hookPhase(
+  subtype: "hook_started" | "hook_progress" | "hook_response",
+): "started" | "progress" | "completed" {
+  switch (subtype) {
+    case "hook_started":
+      return "started";
+    case "hook_progress":
+      return "progress";
+    case "hook_response":
+      return "completed";
+  }
+}
+
 function projectSystem(
   message: Extract<SDKMessage, { type: "system" }>,
   context: ProjectionContext,
@@ -347,10 +361,11 @@ function projectSystem(
           type: "runtime.patch",
           patch: {
             hooks: [{
-              subtype: message.subtype,
+              source: "sdk-event",
+              event: message.hook_event,
+              phase: hookPhase(message.subtype),
               hookId: message.hook_id,
               hookName: message.hook_name,
-              hookEvent: message.hook_event,
               ...(message.subtype === "hook_response"
                 ? { outcome: message.outcome }
                 : {}),
@@ -397,7 +412,10 @@ function projectSystem(
             kind: "error",
             error: {
               code: "TOOL_PERMISSION_DENIED",
-              message: message.message,
+              message: boundedErrorText(
+                message.message,
+                SDK_ERROR_MESSAGE_LIMIT,
+              ),
               retryable: true,
             },
             createdAt: context.now(),
@@ -411,8 +429,9 @@ function projectSystem(
           patch: { versions: { cli: message.qodercli_version } },
         },
       ];
-    case "status":
     case "session_state_changed":
+      return [{ type: "session.state", state: message.state }];
+    case "status":
     case "files_persisted":
     case "elicitation_complete":
       return [];

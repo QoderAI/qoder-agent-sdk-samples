@@ -59,6 +59,11 @@ function removeSession(state: AppState, sessionId: string): AppState {
   const interactions = withoutSession(state.interactions, sessionId);
   const tasks = withoutSession(state.tasks, sessionId);
   const mcpServers = withoutSession(state.mcpServers, sessionId);
+  const checkpointPreviews = withoutSession(state.checkpointPreviews, sessionId);
+  const checkpointCompletions = withoutSession(
+    state.checkpointCompletions,
+    sessionId,
+  );
   return {
     ...state,
     sessionIds: removeId(state.sessionIds, sessionId),
@@ -72,6 +77,11 @@ function removeSession(state: AppState, sessionId: string): AppState {
     tasks,
     mcpServerIds: state.mcpServerIds.filter((id) => mcpServers[id] !== undefined),
     mcpServers,
+    checkpointPreviewIds: state.checkpointPreviewIds.filter(
+      (id) => checkpointPreviews[id] !== undefined,
+    ),
+    checkpointPreviews,
+    checkpointCompletions,
     runtime: without(state.runtime, sessionId),
     commandOwnerships: state.commandOwnerships.filter(
       (entry) => !removedCommandIds.has(entry.commandId),
@@ -112,6 +122,9 @@ export function createInitialState(): AppState {
     tasks: {},
     mcpServerIds: [],
     mcpServers: {},
+    checkpointPreviewIds: [],
+    checkpointPreviews: {},
+    checkpointCompletions: {},
     runtime: {},
     commandFailures: [],
     commandOwnerships: [],
@@ -155,6 +168,9 @@ function replaceSnapshot(state: AppState, snapshot: AppSnapshot): AppState {
     tasks: indexBy(snapshot.tasks, taskKey),
     mcpServerIds: snapshot.mcpServers.map(mcpKey),
     mcpServers: indexBy(snapshot.mcpServers, mcpKey),
+    checkpointPreviewIds: snapshot.checkpointPreviews.map((preview) => preview.id),
+    checkpointPreviews: indexById(snapshot.checkpointPreviews),
+    checkpointCompletions: {},
     runtime: { ...snapshot.runtime },
     protocolError: null,
   };
@@ -211,14 +227,23 @@ function applyEvent(state: AppState, event: EventEnvelope): AppState {
         messages: { ...state.messages, [event.payload.sessionId]: items },
       };
     }
-    case "conversation.replaced":
+    case "conversation.replaced": {
+      const checkpointPreviews = withoutSession(
+        state.checkpointPreviews,
+        event.payload.sessionId,
+      );
       return {
         ...state,
         messages: {
           ...state.messages,
           [event.payload.sessionId]: [...event.payload.items],
         },
+        checkpointPreviewIds: state.checkpointPreviewIds.filter(
+          (id) => checkpointPreviews[id] !== undefined,
+        ),
+        checkpointPreviews,
       };
+    }
     case "interaction.opened":
       return {
         ...state,
@@ -294,9 +319,49 @@ function applyEvent(state: AppState, event: EventEnvelope): AppState {
         },
       };
     case "checkpoint.previewed":
+      return {
+        ...state,
+        checkpointPreviewIds: upsertId(
+          state.checkpointPreviewIds,
+          event.payload.id,
+        ),
+        checkpointPreviews: {
+          ...state.checkpointPreviews,
+          [event.payload.id]: event.payload,
+        },
+        checkpointCompletions: without(
+          state.checkpointCompletions,
+          event.payload.id,
+        ),
+      };
     case "checkpoint.removed":
+      return {
+        ...state,
+        checkpointPreviewIds: removeId(
+          state.checkpointPreviewIds,
+          event.payload.previewId,
+        ),
+        checkpointPreviews: without(
+          state.checkpointPreviews,
+          event.payload.previewId,
+        ),
+      };
     case "checkpoint.completed":
-      return state;
+      return {
+        ...state,
+        checkpointPreviewIds: removeId(
+          state.checkpointPreviewIds,
+          event.payload.previewId,
+        ),
+        checkpointPreviews: without(
+          state.checkpointPreviews,
+          event.payload.previewId,
+        ),
+        checkpointCompletions: {
+          ...state.checkpointCompletions,
+          [event.payload.previewId]: event.payload,
+        },
+      };
     case "command.failed":
       return {
         ...state,

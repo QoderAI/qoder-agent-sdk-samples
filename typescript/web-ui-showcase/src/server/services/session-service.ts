@@ -207,6 +207,7 @@ export class SessionService {
   }
 
   send(sessionId: string, input: SendMessageCommand): void {
+    this.#registry.assertNoPendingMutation(sessionId);
     const controller = this.requireLive(sessionId);
     this.#enqueueMessage(controller, sessionId, input);
   }
@@ -217,6 +218,8 @@ export class SessionService {
     input: SendMessageCommand,
   ): void {
     const queued = controller.send(input);
+    controller.bumpTranscriptRevision();
+    this.#clearCheckpoints(sessionId);
     this.#journal.publish(
       {
         type: "conversation.item",
@@ -266,11 +269,13 @@ export class SessionService {
 
   async #resumeUnlocked(sessionId: string): Promise<void> {
     const view = this.requireRestorable(sessionId);
+    this.#clearCheckpoints(sessionId);
     await this.#startController(view, { resumeSessionId: sessionId });
   }
 
   async #restartForMcpUnlocked(sessionId: string): Promise<void> {
     const view = this.requireSession(sessionId);
+    this.#clearCheckpoints(sessionId);
     await this.requireLive(sessionId).close(
       "Restarting the Session to reconnect MCP servers.",
     );
@@ -427,6 +432,9 @@ export class SessionService {
     });
     const release = this.#registry.reserve(view.id, controller);
     controller.attachRegistryRelease(release);
+    if (lifecycle.newSessionId !== undefined) {
+      this.#publishSession(view);
+    }
     try {
       const initialized = await controller.start();
       if (initialMessage !== undefined) {

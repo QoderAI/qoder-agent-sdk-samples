@@ -93,8 +93,8 @@ export function ConversationRoot(props: {
           return item?.sessionId === session.id ? [item] : [];
         });
   const searchWorkspaceFiles = useCallback(
-    (sessionId: string, query: string) =>
-      props.api.searchWorkspaceFiles(sessionId, query),
+    (sessionId: string, query: string, signal?: AbortSignal) =>
+      props.api.searchWorkspaceFiles(sessionId, query, signal),
     [props.api],
   );
   const target: ComposerTarget =
@@ -228,6 +228,8 @@ export function ConversationRoot(props: {
           "stop",
           "cancel",
           "context",
+          "checkpoint-preview",
+          "checkpoint-execute",
         ] as const).map((control) => ({
           surface: "conversation" as const,
           control,

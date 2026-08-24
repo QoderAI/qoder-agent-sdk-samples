@@ -108,7 +108,7 @@ const checkpointCompletedPayloadSchema = z
   .object({
     sessionId: sessionIdSchema,
     previewId: z.string().uuid(),
-    status: z.string().min(1),
+    status: z.enum(["success", "partial"]),
     failedFiles: z.array(z.string()),
   })
   .strict();

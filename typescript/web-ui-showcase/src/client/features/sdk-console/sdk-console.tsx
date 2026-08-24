@@ -85,6 +85,43 @@ function RecordListPanel(props: {
   );
 }
 
+function HooksPanel(props: { runtime: SessionRuntimeView | undefined }): JSX.Element {
+  const hooks = props.runtime?.hooks ?? [];
+  return (
+    <section className="sdk-console-section">
+      <h2>Hooks</h2>
+      {hooks.length > 0
+        ? hooks.map((hook, index) => {
+            const event = typeof hook.event === "string" ? hook.event : "Hook";
+            const source = typeof hook.source === "string"
+              ? hook.source
+              : "unknown source";
+            const phase = typeof hook.phase === "string"
+              ? hook.phase
+              : "unknown phase";
+            const hookId = typeof hook.hookId === "string"
+              ? hook.hookId
+              : undefined;
+            return (
+              <article
+                className="sdk-console-entry"
+                data-hook-id={hookId}
+                key={index}
+              >
+                <header className="sdk-console-hook-header">
+                  <strong>{event}</strong>
+                  <span>{source} · {phase}</span>
+                  {hookId === undefined ? null : <code>Hook ID {hookId}</code>}
+                </header>
+                <pre>{JSON.stringify(hook, null, 2)}</pre>
+              </article>
+            );
+          })
+        : <p>暂无 Hook 事件。</p>}
+    </section>
+  );
+}
+
 /** Hosts SDK runtime observability and capability panels behind tabs. */
 export function SdkConsole(props: { api: SdkConsoleApi }): JSX.Element {
   const state = useAppState();
@@ -115,19 +152,7 @@ export function SdkConsole(props: { api: SdkConsoleApi }): JSX.Element {
   let content: ReactNode;
   switch (tab) {
     case "hooks":
-      content = (
-        <section className="sdk-console-section">
-          <h2>Hooks</h2>
-          {runtime !== undefined && runtime.hooks.length > 0
-            ? runtime.hooks.map((hook, index) => (
-                <article className="sdk-console-entry" key={index}>
-                  <strong>{typeof hook.event === "string" ? hook.event : "Hook"}</strong>
-                  <pre>{JSON.stringify(hook, null, 2)}</pre>
-                </article>
-              ))
-            : <p>暂无 Hook 事件。</p>}
-        </section>
-      );
+      content = <HooksPanel runtime={runtime} />;
       break;
     case "raw-events":
       content = (

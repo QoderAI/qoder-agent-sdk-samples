@@ -5,6 +5,7 @@ import {
   fireEvent,
   render,
   screen,
+  waitFor,
   within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -30,6 +31,7 @@ function setupShell(options: {
   items?: ConversationItem[];
   interactions?: AppSnapshot["interactions"];
   tasks?: AppSnapshot["tasks"];
+  checkpointPreviews?: AppSnapshot["checkpointPreviews"];
   selectedSession?: boolean;
 } = {}) {
   const store = new AppStore();
@@ -58,7 +60,7 @@ function setupShell(options: {
     interactions: options.interactions ?? [],
     tasks: options.tasks ?? [],
     mcpServers: [],
-    checkpointPreviews: [],
+    checkpointPreviews: options.checkpointPreviews ?? [],
     runtime: {},
   };
   store.applyFrame({ kind: "snapshot", snapshot });
@@ -82,6 +84,8 @@ function setupShell(options: {
     backgroundTasks: vi.fn(accepted),
     interruptSession: vi.fn(accepted),
     refreshContext: vi.fn(accepted),
+    previewCheckpoint: vi.fn(accepted),
+    executeCheckpoint: vi.fn(accepted),
     searchWorkspaceFiles: vi.fn(async () => ({ items: [], truncated: false })),
     authenticateMcp: vi.fn(accepted),
     submitMcpCallback: vi.fn(accepted),
@@ -262,30 +266,12 @@ describe("conversation UI", () => {
             durationMs: 120,
             createdAt: "2026-08-14T08:00:01.000Z",
           },
-          {
-            id: "00000000-0000-4000-8000-000000000d10",
-            sessionId,
-            kind: "result",
-            success: true,
-            text: "Done",
-            createdAt: "2026-08-14T08:00:02.000Z",
-          },
-          {
-            id: "00000000-0000-4000-8000-000000000d11",
-            sessionId,
-            kind: "raw",
-            messageType: "result.success",
-            payload: {},
-            createdAt: "2026-08-14T08:00:03.000Z",
-          },
         ]}
       />,
     );
     expect(screen.getByLabelText("用户消息")).toHaveTextContent("请检查项目");
     expect(screen.getByLabelText("assistant 消息")).toHaveTextContent("Working on it");
     expect(screen.getByText("Working on it")).toHaveAttribute("aria-live", "polite");
-    expect(screen.queryByText("Done")).not.toBeInTheDocument();
-    expect(screen.queryByText("result.success")).not.toBeInTheDocument();
     const tool = screen.getByRole("button", { name: /Bash.*已完成/ });
     expect(tool).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByText(/npm test/)).not.toBeInTheDocument();
@@ -394,22 +380,321 @@ describe("conversation UI", () => {
       .not.toBeInTheDocument();
   });
 
-  it("does not expose Checkpoint controls beneath user messages", () => {
-    setupShell({
-      items: [{
-        id: "00000000-0000-4000-8000-000000000d90",
-        sessionId,
-        kind: "user",
-        text: "保留这条消息",
-        createdAt: "2026-08-14T08:00:00.000Z",
-      }],
+  it("previews and executes a Checkpoint with modal focus preserved", async () => {
+    const user = userEvent.setup();
+    const userMessage = {
+      id: "00000000-0000-4000-8000-000000000d90",
+      sessionId,
+      kind: "user" as const,
+      text: "保留这条消息",
+      createdAt: "2026-08-14T08:00:00.000Z",
+    };
+    const previewId = "00000000-0000-4000-8000-000000000d91";
+    const previewCommandId = "00000000-0000-4000-8000-000000000d92";
+    const executeCommandId = "00000000-0000-4000-8000-000000000d93";
+    const { store, api } = setupShell({ items: [userMessage] });
+    api.previewCheckpoint.mockResolvedValueOnce({ commandId: previewCommandId });
+    api.executeCheckpoint.mockResolvedValueOnce({ commandId: executeCommandId });
+
+    const trigger = screen.getByRole("button", { name: "Checkpoint" });
+    await user.click(trigger);
+    let dialog = screen.getByRole("dialog", { name: "回退到这条消息" });
+    expect(within(dialog).getByRole("radio", { name: "仅文件" })).toHaveFocus();
+    expect(within(dialog).getByRole("radio", { name: "仅对话" })).toBeDisabled();
+    expect(within(dialog).getByRole("radio", { name: "文件和对话" })).toBeDisabled();
+
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog", { name: "回退到这条消息" }))
+      .not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+
+    await user.click(trigger);
+    dialog = screen.getByRole("dialog", { name: "回退到这条消息" });
+    await user.click(within(dialog).getByRole("button", { name: "预览影响" }));
+    expect(api.previewCheckpoint).toHaveBeenCalledWith(sessionId, {
+      userMessageId: userMessage.id,
+      scope: "files",
+    });
+    await waitFor(() =>
+      expect(store.getState().commandOwnerships).toContainEqual({
+        commandId: previewCommandId,
+        owner: {
+          surface: "conversation",
+          control: "checkpoint-preview",
+          sessionId,
+        },
+      }),
+    );
+
+    act(() => {
+      store.applyFrame({
+        kind: "events",
+        events: [{
+          serverEpoch: "epoch-conversation",
+          sequence: 1,
+          occurredAt: "2026-08-14T08:00:01.000Z",
+          commandId: previewCommandId,
+          sessionId,
+          type: "checkpoint.previewed",
+          payload: {
+            id: previewId,
+            sessionId,
+            userMessageId: userMessage.id,
+            scope: "files",
+            expiresAt: "2099-08-14T08:05:00.000Z",
+            canRewind: true,
+            status: "ready",
+            filesChanged: ["src/app.ts", "src/server.ts"],
+            insertions: 12,
+            deletions: 3,
+            failedFiles: [],
+          },
+        }],
+      });
     });
 
-    const message = screen.getByLabelText("用户消息");
-    expect(within(message).queryByLabelText("Checkpoint 范围"))
-      .not.toBeInTheDocument();
-    expect(within(message).queryByRole("button", { name: "回到这里" }))
-      .not.toBeInTheDocument();
+    expect(within(dialog).getByRole("heading", { name: "预览结果" })).toBeVisible();
+    expect(within(dialog).getByText("src/app.ts")).toBeVisible();
+    expect(within(dialog).getByText("+12")).toBeVisible();
+    const execute = within(dialog).getByRole("button", { name: "执行 Checkpoint" });
+    await waitFor(() => expect(execute).toBeEnabled());
+    await user.click(execute);
+    expect(api.executeCheckpoint).toHaveBeenCalledWith(sessionId, {
+      previewId,
+      userMessageId: userMessage.id,
+      scope: "files",
+    });
+    await waitFor(() =>
+      expect(store.getState().commandOwnerships).toContainEqual({
+        commandId: executeCommandId,
+        owner: {
+          surface: "conversation",
+          control: "checkpoint-execute",
+          sessionId,
+        },
+      }),
+    );
+
+    act(() => {
+      store.applyFrame({
+        kind: "events",
+        events: [
+          {
+            serverEpoch: "epoch-conversation",
+            sequence: 2,
+            occurredAt: "2026-08-14T08:00:02.000Z",
+            sessionId,
+            type: "checkpoint.removed",
+            payload: { sessionId, previewId },
+          },
+          {
+            serverEpoch: "epoch-conversation",
+            sequence: 3,
+            occurredAt: "2026-08-14T08:00:03.000Z",
+            sessionId,
+            type: "conversation.replaced",
+            payload: { sessionId, items: [userMessage] },
+          },
+          {
+            serverEpoch: "epoch-conversation",
+            sequence: 4,
+            occurredAt: "2026-08-14T08:00:04.000Z",
+            commandId: executeCommandId,
+            sessionId,
+            type: "checkpoint.completed",
+            payload: {
+              sessionId,
+              previewId,
+              status: "success",
+              failedFiles: [],
+            },
+          },
+        ],
+      });
+    });
+
+    expect(await within(dialog).findByText("Checkpoint 已完成，对话已重新加载。"))
+      .toBeVisible();
+    await user.click(within(dialog).getByRole("button", { name: "关闭" }));
+    expect(trigger).toHaveFocus();
+  });
+
+  it("renders partial Checkpoint completion with every failed file", async () => {
+    const user = userEvent.setup();
+    const userMessage = {
+      id: "00000000-0000-4000-8000-000000000d94",
+      sessionId,
+      kind: "user" as const,
+      text: "回退部分文件",
+      createdAt: "2026-08-14T08:00:00.000Z",
+    };
+    const preview = {
+      id: "00000000-0000-4000-8000-000000000d95",
+      sessionId,
+      userMessageId: userMessage.id,
+      scope: "files" as const,
+      expiresAt: "2099-08-14T08:05:00.000Z",
+      canRewind: true,
+      status: "ready" as const,
+      filesChanged: ["src/app.ts", "src/locked.ts"],
+      insertions: 4,
+      deletions: 2,
+      failedFiles: [],
+    };
+    const commandId = "00000000-0000-4000-8000-000000000d96";
+    const { store, api } = setupShell({
+      items: [userMessage],
+      checkpointPreviews: [preview],
+    });
+    api.executeCheckpoint.mockResolvedValueOnce({ commandId });
+
+    await user.click(screen.getByRole("button", { name: "Checkpoint" }));
+    const dialog = screen.getByRole("dialog", { name: "回退到这条消息" });
+    await user.click(within(dialog).getByRole("button", {
+      name: "执行 Checkpoint",
+    }));
+    await waitFor(() =>
+      expect(store.getState().commandOwnerships).toContainEqual({
+        commandId,
+        owner: {
+          surface: "conversation",
+          control: "checkpoint-execute",
+          sessionId,
+        },
+      }),
+    );
+
+    act(() => {
+      store.applyFrame({
+        kind: "events",
+        events: [
+          {
+            serverEpoch: "epoch-conversation",
+            sequence: 1,
+            occurredAt: "2026-08-14T08:00:01.000Z",
+            sessionId,
+            type: "checkpoint.removed",
+            payload: { sessionId, previewId: preview.id },
+          },
+          {
+            serverEpoch: "epoch-conversation",
+            sequence: 2,
+            occurredAt: "2026-08-14T08:00:02.000Z",
+            sessionId,
+            type: "conversation.replaced",
+            payload: { sessionId, items: [userMessage] },
+          },
+          {
+            serverEpoch: "epoch-conversation",
+            sequence: 3,
+            occurredAt: "2026-08-14T08:00:03.000Z",
+            commandId,
+            sessionId,
+            type: "checkpoint.completed",
+            payload: {
+              sessionId,
+              previewId: preview.id,
+              status: "partial",
+              failedFiles: ["src/locked.ts", "src/generated.ts"],
+            },
+          },
+        ],
+      });
+    });
+
+    expect(await within(dialog).findByText(
+      "Checkpoint 已完成，但部分文件回退失败。",
+    )).toBeVisible();
+    expect(within(dialog).getByText("src/locked.ts")).toBeVisible();
+    expect(within(dialog).getByText("src/generated.ts")).toBeVisible();
+    expect(within(dialog).getByRole("button", { name: "关闭" })).toBeEnabled();
+  });
+
+  it("keeps an asynchronous Checkpoint failure inside its open dialog", async () => {
+    const user = userEvent.setup();
+    const userMessage = {
+      id: "00000000-0000-4000-8000-000000000d97",
+      sessionId,
+      kind: "user" as const,
+      text: "触发回退失败",
+      createdAt: "2026-08-14T08:00:00.000Z",
+    };
+    const preview = {
+      id: "00000000-0000-4000-8000-000000000d98",
+      sessionId,
+      userMessageId: userMessage.id,
+      scope: "files" as const,
+      expiresAt: "2099-08-14T08:05:00.000Z",
+      canRewind: true,
+      status: "ready" as const,
+      filesChanged: ["src/app.ts"],
+      insertions: 1,
+      deletions: 1,
+      failedFiles: [],
+    };
+    const commandId = "00000000-0000-4000-8000-000000000d99";
+    const failureMessage = "Checkpoint 预览已失效，请重新预览。";
+    const { store, api } = setupShell({
+      items: [userMessage],
+      checkpointPreviews: [preview],
+    });
+    api.executeCheckpoint.mockResolvedValueOnce({ commandId });
+
+    await user.click(screen.getByRole("button", { name: "Checkpoint" }));
+    const dialog = screen.getByRole("dialog", { name: "回退到这条消息" });
+    await user.click(within(dialog).getByRole("button", {
+      name: "执行 Checkpoint",
+    }));
+    await waitFor(() =>
+      expect(store.getState().commandOwnerships).toContainEqual({
+        commandId,
+        owner: {
+          surface: "conversation",
+          control: "checkpoint-execute",
+          sessionId,
+        },
+      }),
+    );
+
+    act(() => {
+      store.applyFrame({
+        kind: "events",
+        events: [
+          {
+            serverEpoch: "epoch-conversation",
+            sequence: 1,
+            occurredAt: "2026-08-14T08:00:01.000Z",
+            sessionId,
+            type: "checkpoint.removed",
+            payload: { sessionId, previewId: preview.id },
+          },
+          {
+            serverEpoch: "epoch-conversation",
+            sequence: 2,
+            occurredAt: "2026-08-14T08:00:02.000Z",
+            commandId,
+            sessionId,
+            type: "command.failed",
+            payload: {
+              error: {
+                code: "CHECKPOINT_PREVIEW_INVALID",
+                message: failureMessage,
+                retryable: false,
+              },
+            },
+          },
+        ],
+      });
+    });
+
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+      failureMessage,
+    );
+    await waitFor(() => expect(store.getState().commandFailures).toEqual([]));
+    expect(screen.getAllByText(failureMessage)).toHaveLength(1);
+    expect(document.querySelector(".command-failure")).toBeNull();
+    expect(within(dialog).getByRole("button", { name: "预览影响" }))
+      .toBeEnabled();
   });
 
   it("keeps one Composer DOM owner when the hero becomes an active Session", () => {

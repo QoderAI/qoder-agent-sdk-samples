@@ -14,9 +14,7 @@ export type ServerConfig = {
   eventCapacity: number;
   enableCheckpoints: boolean;
   rawEvents: boolean;
-  devOrigin: string;
   allowedOrigins: ReadonlySet<string>;
-  extensionsConfigFile?: string;
   mcpConfigFile?: string;
 };
 
@@ -147,15 +145,7 @@ export function loadServerConfig(
       true,
       "QODER_WEBUI_RAW_EVENTS",
     ),
-    devOrigin: parsedDevOrigin.origin,
     allowedOrigins: new Set([productionOrigin, parsedDevOrigin.origin]),
-    ...(environment.QODER_WEBUI_EXTENSIONS_CONFIG_FILE === undefined ||
-    environment.QODER_WEBUI_EXTENSIONS_CONFIG_FILE.trim().length === 0
-      ? {}
-      : {
-          extensionsConfigFile:
-            environment.QODER_WEBUI_EXTENSIONS_CONFIG_FILE,
-        }),
     ...(environment.QODER_WEBUI_MCP_CONFIG_FILE === undefined ||
     environment.QODER_WEBUI_MCP_CONFIG_FILE.trim().length === 0
       ? {}

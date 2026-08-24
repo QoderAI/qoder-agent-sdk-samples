@@ -40,6 +40,32 @@ function sessionView(
   };
 }
 
+type ConversationMutation = {
+  sequence: number;
+  item: ConversationItem;
+};
+
+type HistoryState = {
+  generation: number;
+  status: "unloaded" | "loading" | "loaded";
+  pending: ConversationMutation[];
+  inFlight?: Promise<void>;
+};
+
+function upsertConversationItem(
+  items: readonly ConversationItem[],
+  item: ConversationItem,
+): ConversationItem[] {
+  const index = items.findIndex((candidate) => candidate.id === item.id);
+  const next = [...items];
+  if (index === -1) {
+    next.push(item);
+  } else {
+    next[index] = item;
+  }
+  return next;
+}
+
 /** Maintains the browser-facing projection and rebuilds durable state at startup. */
 export class SnapshotService {
   readonly #workspaceService: WorkspaceService;
@@ -48,7 +74,8 @@ export class SnapshotService {
   readonly #workspaces = new Map<string, WorkspaceView>();
   readonly #sessions = new Map<string, SessionView>();
   readonly #messages = new Map<string, ConversationItem[]>();
-  readonly #loadedHistories = new Set<string>();
+  readonly #historyStates = new Map<string, HistoryState>();
+  readonly #historyGenerations = new Map<string, number>();
   readonly #queuedInputs = new Map<string, QueuedInputView>();
   readonly #interactions = new Map<string, InteractionView>();
   readonly #tasks = new Map<string, TaskView>();
@@ -73,7 +100,7 @@ export class SnapshotService {
     this.#workspaces.clear();
     this.#sessions.clear();
     this.#messages.clear();
-    this.#loadedHistories.clear();
+    this.#historyStates.clear();
     const workspaces = await this.#workspaceService.list();
     for (const workspace of workspaces) {
       this.#workspaces.set(workspace.id, workspace);
@@ -82,30 +109,68 @@ export class SnapshotService {
       );
       for (const record of records) {
         this.#sessions.set(record.id, sessionView(workspace, record));
+        this.#historyState(record.id);
       }
     }
   }
 
   /** Loads one selected transcript on demand, preserving stored timestamps. */
   async loadSession(sessionId: string): Promise<void> {
-    if (this.#loadedHistories.has(sessionId)) {
-      return;
-    }
     const session = this.#sessions.get(sessionId);
     if (session === undefined) {
-      throw new AppError({
-        code: "SESSION_NOT_FOUND",
-        message: "The selected Session no longer exists.",
-        status: 404,
-        retryable: false,
-      });
+      throw this.#sessionNotFound();
     }
-    const history = await this.#sessionCatalog.messages(
-      session.cwd,
-      sessionId,
-    );
-    this.#messages.set(sessionId, projectHistory(history));
-    this.#loadedHistories.add(sessionId);
+    const state = this.#historyState(sessionId);
+    if (state.status === "loaded") {
+      return;
+    }
+    if (state.inFlight !== undefined) {
+      await state.inFlight;
+      if (!this.#sessions.has(sessionId)) {
+        throw this.#sessionNotFound();
+      }
+      return;
+    }
+
+    state.status = "loading";
+    const generation = state.generation;
+    const load = (async () => {
+      try {
+        const history = await this.#sessionCatalog.messages(
+          session.cwd,
+          sessionId,
+        );
+        if (
+          this.#historyStates.get(sessionId) !== state ||
+          state.generation !== generation
+        ) {
+          return;
+        }
+        let messages = projectHistory(history);
+        for (const mutation of state.pending.sort(
+          (left, right) => left.sequence - right.sequence,
+        )) {
+          messages = upsertConversationItem(messages, mutation.item);
+        }
+        this.#messages.set(sessionId, messages);
+        state.pending = [];
+        state.status = "loaded";
+      } catch (error) {
+        if (this.#historyStates.get(sessionId) === state) {
+          state.status = "unloaded";
+        }
+        throw error;
+      } finally {
+        if (this.#historyStates.get(sessionId) === state) {
+          delete state.inFlight;
+        }
+      }
+    })();
+    state.inFlight = load;
+    await load;
+    if (!this.#sessions.has(sessionId)) {
+      throw this.#sessionNotFound();
+    }
   }
 
   /** Returns a validated snapshot, with history only for the selected Session. */
@@ -166,6 +231,7 @@ export class SnapshotService {
         return;
       case "session.upserted":
         this.#sessions.set(event.payload.id, event.payload);
+        this.#historyState(event.payload.id);
         return;
       case "session.removed":
         this.#removeSession(event.payload.sessionId);
@@ -185,24 +251,41 @@ export class SnapshotService {
         return;
       }
       case "conversation.item": {
-        const items = this.#messages.get(event.payload.sessionId) ?? [];
-        const index = items.findIndex(
-          (item) => item.id === event.payload.item.id,
-        );
-        const next = [...items];
-        if (index === -1) {
-          next.push(event.payload.item);
-        } else {
-          next[index] = event.payload.item;
+        const sessionId = event.payload.sessionId;
+        if (!this.#sessions.has(sessionId)) {
+          return;
         }
-        this.#messages.set(event.payload.sessionId, next);
-        this.#loadedHistories.add(event.payload.sessionId);
+        const state = this.#historyState(sessionId);
+        if (state.status === "loaded") {
+          this.#messages.set(
+            sessionId,
+            upsertConversationItem(
+              this.#messages.get(sessionId) ?? [],
+              event.payload.item,
+            ),
+          );
+        } else {
+          state.pending.push({
+            sequence: event.sequence,
+            item: event.payload.item,
+          });
+        }
         return;
       }
-      case "conversation.replaced":
-        this.#messages.set(event.payload.sessionId, [...event.payload.items]);
-        this.#loadedHistories.add(event.payload.sessionId);
+      case "conversation.replaced": {
+        const sessionId = event.payload.sessionId;
+        if (!this.#sessions.has(sessionId)) {
+          return;
+        }
+        const state: HistoryState = {
+          generation: this.#nextHistoryGeneration(sessionId),
+          status: "loaded",
+          pending: [],
+        };
+        this.#historyStates.set(sessionId, state);
+        this.#messages.set(sessionId, [...event.payload.items]);
         return;
+      }
       case "interaction.opened":
         this.#interactions.set(event.payload.id, event.payload);
         return;
@@ -250,10 +333,40 @@ export class SnapshotService {
     }
   }
 
+  #historyState(sessionId: string): HistoryState {
+    const existing = this.#historyStates.get(sessionId);
+    if (existing !== undefined) {
+      return existing;
+    }
+    const state: HistoryState = {
+      generation: this.#nextHistoryGeneration(sessionId),
+      status: "unloaded",
+      pending: [],
+    };
+    this.#historyStates.set(sessionId, state);
+    return state;
+  }
+
+  #nextHistoryGeneration(sessionId: string): number {
+    const generation = (this.#historyGenerations.get(sessionId) ?? 0) + 1;
+    this.#historyGenerations.set(sessionId, generation);
+    return generation;
+  }
+
+  #sessionNotFound(): AppError {
+    return new AppError({
+      code: "SESSION_NOT_FOUND",
+      message: "The selected Session no longer exists.",
+      status: 404,
+      retryable: false,
+    });
+  }
+
   #removeSession(sessionId: string): void {
     this.#sessions.delete(sessionId);
     this.#messages.delete(sessionId);
-    this.#loadedHistories.delete(sessionId);
+    this.#historyStates.delete(sessionId);
+    this.#nextHistoryGeneration(sessionId);
     this.#runtime.delete(sessionId);
     for (const [key, input] of this.#queuedInputs) {
       if (input.sessionId === sessionId) this.#queuedInputs.delete(key);

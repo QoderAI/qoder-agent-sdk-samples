@@ -3,6 +3,7 @@ import type { DetailsSelection } from "../features/layout/details-selection.js";
 import type { CommandOwnership } from "./command-ownership.js";
 import type {
   ConversationItem,
+  CheckpointPreviewView,
   SessionRuntimeView,
   InteractionView,
   McpServerView,
@@ -17,6 +18,12 @@ export type CommandFailureView = {
   commandId?: string;
   sessionId?: string;
   error: WireError;
+};
+export type CheckpointCompletionView = {
+  sessionId: string;
+  previewId: string;
+  status: "success" | "partial";
+  failedFiles: string[];
 };
 export type SdkConsoleTab =
   | "hooks"
@@ -55,6 +62,9 @@ export type AppState = ProductViewState & {
   tasks: Record<string, TaskView>;
   mcpServerIds: string[];
   mcpServers: Record<string, McpServerView>;
+  checkpointPreviewIds: string[];
+  checkpointPreviews: Record<string, CheckpointPreviewView>;
+  checkpointCompletions: Record<string, CheckpointCompletionView>;
   runtime: Record<string, SessionRuntimeView>;
   commandFailures: CommandFailureView[];
   commandOwnerships: CommandOwnership[];
