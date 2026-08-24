@@ -67,6 +67,9 @@ export function CheckpointDialog(props: {
   const [previewCommandId, setPreviewCommandId] = useState<string | null>(null);
   const [executeCommandId, setExecuteCommandId] = useState<string | null>(null);
   const [executionPreviewId, setExecutionPreviewId] = useState<string | null>(null);
+  const [previewRequestBaselineId, setPreviewRequestBaselineId] = useState<
+    string | null | undefined
+  >(undefined);
   const [submissionError, setSubmissionError] = useState<string | null>(null);
   const [clock, setClock] = useState(() => Date.now());
   const supportsFullRewind =
@@ -76,7 +79,12 @@ export function CheckpointDialog(props: {
     const preview = state.checkpointPreviews[id];
     return preview === undefined ? [] : [preview];
   });
-  const preview = latestMatchingPreview(previews, props.target, scope);
+  const matchingPreview = latestMatchingPreview(previews, props.target, scope);
+  const preview = previewRequestBaselineId !== undefined &&
+      (matchingPreview === undefined ||
+        matchingPreview.id === previewRequestBaselineId)
+    ? undefined
+    : matchingPreview;
   const completion = executionPreviewId === null
     ? undefined
     : state.checkpointCompletions[executionPreviewId];
@@ -112,6 +120,7 @@ export function CheckpointDialog(props: {
 
   useEffect(() => {
     if (phase === "previewing" && preview !== undefined) {
+      setPreviewRequestBaselineId(undefined);
       setPhase("idle");
     }
   }, [phase, preview]);
@@ -140,6 +149,7 @@ export function CheckpointDialog(props: {
     setPreviewCommandId(null);
     setExecuteCommandId(null);
     setExecutionPreviewId(null);
+    setPreviewRequestBaselineId(undefined);
     setClock(Date.now());
   };
 
@@ -150,6 +160,7 @@ export function CheckpointDialog(props: {
     setPreviewCommandId(null);
     setExecuteCommandId(null);
     setExecutionPreviewId(null);
+    setPreviewRequestBaselineId(matchingPreview?.id ?? null);
     void props.api.previewCheckpoint(props.session.id, {
       userMessageId: props.target.id,
       scope,

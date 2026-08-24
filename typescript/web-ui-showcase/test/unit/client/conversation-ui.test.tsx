@@ -32,10 +32,23 @@ function setupShell(options: {
   interactions?: AppSnapshot["interactions"];
   tasks?: AppSnapshot["tasks"];
   checkpointPreviews?: AppSnapshot["checkpointPreviews"];
+  checkpointEnabled?: boolean;
   selectedSession?: boolean;
 } = {}) {
   const store = new AppStore();
   const workspaceId = "00000000-0000-4000-8000-000000000d30";
+  const session: AppSnapshot["sessions"][number] = {
+    id: sessionId,
+    workspaceId,
+    title: "Inspect repository",
+    cwd: "/repo",
+    phase: "idle" as const,
+    awaitingUser: false,
+    updatedAt: "2026-08-14T08:00:00.000Z",
+    ...(options.checkpointEnabled === undefined
+      ? {}
+      : { checkpointEnabled: options.checkpointEnabled }),
+  };
   const snapshot: AppSnapshot = {
     serverEpoch: "epoch-conversation",
     cursor: 0,
@@ -46,15 +59,7 @@ function setupShell(options: {
       createdAt: "2026-08-14T08:00:00.000Z",
       updatedAt: "2026-08-14T08:00:00.000Z",
     }],
-    sessions: [{
-      id: sessionId,
-      workspaceId,
-      title: "Inspect repository",
-      cwd: "/repo",
-      phase: "idle",
-      awaitingUser: false,
-      updatedAt: "2026-08-14T08:00:00.000Z",
-    }],
+    sessions: [session],
     messages: { [sessionId]: options.items ?? [] },
     queuedInputs: [],
     interactions: options.interactions ?? [],
@@ -517,6 +522,61 @@ describe("conversation UI", () => {
       .toBeVisible();
     await user.click(within(dialog).getByRole("button", { name: "关闭" }));
     expect(trigger).toHaveFocus();
+  });
+
+  it("keeps an old Checkpoint preview non-executable while refreshing it", async () => {
+    const user = userEvent.setup();
+    const userMessage = {
+      id: "00000000-0000-4000-8000-000000000db0",
+      sessionId,
+      kind: "user" as const,
+      text: "刷新 Checkpoint 预览",
+      createdAt: "2026-08-14T08:00:00.000Z",
+    };
+    const oldPreviewId = "00000000-0000-4000-8000-000000000db1";
+    const { api } = setupShell({
+      items: [userMessage],
+      checkpointPreviews: [{
+        id: oldPreviewId,
+        sessionId,
+        userMessageId: userMessage.id,
+        scope: "files",
+        expiresAt: "2099-08-14T08:05:00.000Z",
+        canRewind: true,
+        status: "ready",
+        filesChanged: ["README.md"],
+        insertions: 1,
+        deletions: 0,
+        failedFiles: [],
+      }],
+    });
+    api.previewCheckpoint.mockReturnValueOnce(new Promise(() => {}));
+
+    await user.click(screen.getByRole("button", { name: "Checkpoint" }));
+    const dialog = screen.getByRole("dialog", { name: "回退到这条消息" });
+    expect(within(dialog).getByRole("button", { name: "执行 Checkpoint" }))
+      .toBeEnabled();
+    await user.click(within(dialog).getByRole("button", { name: "重新预览" }));
+
+    expect(within(dialog).queryByRole("button", { name: "执行 Checkpoint" }))
+      .not.toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "正在计算影响…" }))
+      .toBeDisabled();
+  });
+
+  it("hides Checkpoint when the server disables the feature", () => {
+    const userMessage = {
+      id: "00000000-0000-4000-8000-000000000db2",
+      sessionId,
+      kind: "user" as const,
+      text: "关闭 Checkpoint",
+      createdAt: "2026-08-14T08:00:00.000Z",
+    };
+
+    setupShell({ items: [userMessage], checkpointEnabled: false });
+
+    expect(screen.queryByRole("button", { name: "Checkpoint" }))
+      .not.toBeInTheDocument();
   });
 
   it("renders partial Checkpoint completion with every failed file", async () => {

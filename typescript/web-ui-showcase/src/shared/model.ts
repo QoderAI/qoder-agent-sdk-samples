@@ -61,6 +61,7 @@ export const sessionViewSchema = z
     createdAt: timestampSchema.optional(),
     tag: z.string().optional(),
     gitBranch: z.string().optional(),
+    checkpointEnabled: z.boolean().optional(),
     capabilities: z.array(z.string()).optional(),
     failure: wireErrorSchema.optional(),
   })

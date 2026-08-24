@@ -161,6 +161,7 @@ export async function createApp(
     runtimeState: sessionRuntime,
     defaultModel: config.model,
     defaultPermissionMode: config.permissionMode,
+    checkpointEnabled: config.enableCheckpoints,
     withWorkspace: (workspaceId, operation) =>
       workspaceService.withWorkspace(workspaceId, operation),
     clearCheckpoints: (sessionId) => checkpoints.clearSession(sessionId),

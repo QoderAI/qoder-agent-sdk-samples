@@ -47,6 +47,7 @@ export class SessionService {
   readonly #now: () => string;
   readonly #defaultModel: string;
   readonly #defaultPermissionMode: SelectablePermissionMode;
+  readonly #checkpointEnabled: boolean;
   readonly #includeRawEvents: boolean;
   readonly #withWorkspace: <T>(
     workspaceId: string,
@@ -73,6 +74,7 @@ export class SessionService {
     now?: () => string;
     defaultModel?: string;
     defaultPermissionMode?: SelectablePermissionMode;
+    checkpointEnabled?: boolean;
     withWorkspace: <T>(
       workspaceId: string,
       operation: (workspace: WorkspaceView) => Promise<T>,
@@ -95,6 +97,7 @@ export class SessionService {
     this.#now = options.now ?? (() => new Date().toISOString());
     this.#defaultModel = options.defaultModel ?? "auto";
     this.#defaultPermissionMode = options.defaultPermissionMode ?? "default";
+    this.#checkpointEnabled = options.checkpointEnabled ?? true;
     this.#withWorkspace = options.withWorkspace;
     this.#clearCheckpoints = options.clearCheckpoints;
     this.#includeRawEvents = options.includeRawEvents ?? true;
@@ -176,6 +179,7 @@ export class SessionService {
         cwd: workspace.path,
         phase: "starting",
         awaitingUser: false,
+        checkpointEnabled: this.#checkpointEnabled,
         createdAt: timestamp,
         updatedAt: timestamp,
       };
@@ -447,6 +451,7 @@ export class SessionService {
         ...(latestTitle === undefined ? {} : { title: latestTitle }),
         phase: controllerLifecycle.phase,
         awaitingUser: controllerLifecycle.awaitingUser,
+        checkpointEnabled: this.#checkpointEnabled,
         capabilities: initialized.capabilities,
         updatedAt: this.#now(),
       });
@@ -509,6 +514,7 @@ export class SessionService {
       cwd: record.cwd,
       phase: "restorable",
       awaitingUser: false,
+      checkpointEnabled: this.#checkpointEnabled,
       updatedAt: record.updatedAt,
       ...(record.createdAt === undefined
         ? {}

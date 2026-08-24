@@ -68,7 +68,9 @@ export function ConversationPanel(props: {
     return interaction?.sessionId === session.id ? [interaction] : [];
   });
   const checkpointAvailable =
-    session.phase === "idle" && interactions.length === 0;
+    session.checkpointEnabled !== false &&
+    session.phase === "idle" &&
+    interactions.length === 0;
   return (
     <>
       <MessageList
