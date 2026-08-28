@@ -38,17 +38,20 @@ async function waitForHealth(origin: string): Promise<void> {
 
 const port = await reservePort();
 const dataDirectory = await mkdtemp(join(tmpdir(), "qoder-webui-production-"));
-const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
-const child = spawn(npmCommand, ["start"], {
-  cwd: process.cwd(),
-  env: {
-    ...process.env,
-    NODE_ENV: "",
-    QODER_WEBUI_DATA_DIR: dataDirectory,
-    QODER_WEBUI_PORT: String(port),
+const child = spawn(
+  process.execPath,
+  ["--env-file-if-exists=.env", "scripts/start-production.mjs"],
+  {
+    cwd: process.cwd(),
+    env: {
+      ...process.env,
+      NODE_ENV: "",
+      QODER_WEBUI_DATA_DIR: dataDirectory,
+      QODER_WEBUI_PORT: String(port),
+    },
+    stdio: ["ignore", "pipe", "pipe"],
   },
-  stdio: ["ignore", "pipe", "pipe"],
-});
+);
 let output = "";
 child.stdout.setEncoding("utf8");
 child.stderr.setEncoding("utf8");
