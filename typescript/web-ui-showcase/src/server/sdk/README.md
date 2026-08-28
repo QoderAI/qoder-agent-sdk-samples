@@ -1,88 +1,88 @@
-# SDK 适配层维护说明
+# SDK Adapter Maintenance Guide
 
-[`src/server/sdk/`](.) 是本样板中唯一允许 import `@qoder-ai/qoder-agent-sdk` 的目录。该边界由 [`scripts/check-sdk-import-boundary.mjs`](../../../scripts/check-sdk-import-boundary.mjs) 强制；`api/`、`services/`、`shared/` 和 `client/` 只依赖应用自己的 port、command、event 与 view model。
+[`src/server/sdk/`](.) is the only directory in this example that may import `@qoder-ai/qoder-agent-sdk`. [`scripts/check-sdk-import-boundary.mjs`](../../../scripts/check-sdk-import-boundary.mjs) enforces the boundary. `api/`, `services/`, `shared/`, and `client/` depend only on application-owned ports, commands, events, and view models.
 
-面向第一次使用 SDK 的完整示例见 [SDK 快速开始](../../../docs/SDK_QUICK_START.md)；端到端架构见 [SDK 代码导览](../../../docs/SDK_CODE_TOUR.md)；安装和运行见[包根 README](../../../README.md)。本页只作为修改 adapter 时的共置索引。
+For complete examples aimed at first-time SDK users, see [SDK Quick Start](../../../docs/SDK_QUICK_START.md). For the end-to-end architecture, see [SDK Code Tour](../../../docs/SDK_CODE_TOUR.md). For installation and runtime selection, see the [package README](../../../README.md). This page is only a colocated index for adapter changes.
 
-## 阅读顺序
+## Reading Order
 
-1. [`query-factory.ts`](query-factory.ts)：应用唯一的 `query()` 构造点，组合 auth、`cwd`、Session 意图、Model、Permission、Checkpoint、partial message、Hooks、MCP 与交互 callback。
-2. [`query-port.ts`](query-port.ts)：产品实际消费的公开 `Query` 方法子集；`adaptQuery()` 是真实 Query 进入应用的接缝。
-3. [`input-queue.ts`](input-queue.ts) 与 [`session-controller.ts`](session-controller.ts)：一个长生命周期 Query 的输入、输出、Session state、interrupt/cancel 与关闭。
-4. [`message-projector.ts`](message-projector.ts) 与 [`history-projector.ts`](history-projector.ts)：live/history 语义投影。
-5. 按下面的能力地图进入具体 adapter。
+1. [`query-factory.ts`](query-factory.ts): the application's only `query()` construction point; composes authentication, `cwd`, session intent, Model, Permission, Checkpoint, partial messages, Hooks, MCP, and interaction callbacks.
+2. [`query-port.ts`](query-port.ts): the subset of public `Query` methods actually consumed by the product; `adaptQuery()` is where a real Query enters the application.
+3. [`input-queue.ts`](input-queue.ts) and [`session-controller.ts`](session-controller.ts): input, output, session state, interrupt/cancel, and shutdown for one long-lived Query.
+4. [`message-projector.ts`](message-projector.ts) and [`history-projector.ts`](history-projector.ts): live/history semantic projection.
+5. Use the capability map below to find a specific adapter.
 
-`QueryPort` **不是**完整 SDK Query 的镜像，也不是能力目录。只有 service/controller 实际调用并且有产品策略与测试的方法才进入该接口；完整公共合同以当前安装的 `@qoder-ai/qoder-agent-sdk` 包导出类型和官方 SDK 参考为准。
+`QueryPort` is **not** a complete mirror or capability catalog for SDK Query. A method belongs in the interface only when a service/controller calls it and product policy and tests exist for it. The public contracts exported by the installed `@qoder-ai/qoder-agent-sdk` package and the official SDK reference remain authoritative.
 
-## 能力地图
+## Capability Map
 
-### Query、认证与 Session 意图
+### Query, Authentication, and Session Intent
 
-| 文件 | SDK 公共符号 | 本层职责 |
+| File | Public SDK symbols | Responsibility in this layer |
 | --- | --- | --- |
-| [`query-factory.ts`](query-factory.ts) | `query`、`Options`、`AuthOptions`、`qodercliAuth`、`accessTokenFromEnv`、`SDKUserMessage` | 选择认证；传入 `cwd`、`sessionId` / `resume` / `forkSession` 与运行时 options |
-| [`query-port.ts`](query-port.ts) | `Query`、`SDKMessage`、`PermissionMode`、`RewindScope` | 声明应用当前消费的最小 Query 子集；不重新实现 SDK 行为 |
-| [`sdk-public-contract.ts`](sdk-public-contract.ts) | `listSessions`、`getSessionInfo`、`getSessionMessages`、`getSubagentMessages`、`listSubagents`、`renameSession`、`tagSession`、`forkSession`、`deleteSession` | 把公开 Session 函数集中为可注入合同 |
-| [`session-catalog.ts`](session-catalog.ts) | `SDKSessionInfo`、`SessionMessage` 与上述函数 | 列出、读取、恢复、重命名、Fork、删除 Session 和读取 Subagent 历史 |
+| [`query-factory.ts`](query-factory.ts) | `query`, `Options`, `AuthOptions`, `qodercliAuth`, `accessTokenFromEnv`, `SDKUserMessage` | Select authentication; pass `cwd`, `sessionId` / `resume` / `forkSession`, and runtime options |
+| [`query-port.ts`](query-port.ts) | `Query`, `SDKMessage`, `PermissionMode`, `RewindScope` | Declare the smallest Query subset currently consumed by the application without reimplementing SDK behavior |
+| [`sdk-public-contract.ts`](sdk-public-contract.ts) | `listSessions`, `getSessionInfo`, `getSessionMessages`, `getSubagentMessages`, `listSubagents`, `renameSession`, `tagSession`, `forkSession`, `deleteSession` | Collect public session functions into an injectable contract |
+| [`session-catalog.ts`](session-catalog.ts) | `SDKSessionInfo`, `SessionMessage`, and the functions above | List, read, restore, rename, fork, and delete sessions, and read Subagent history |
 
-### 长生命周期 Query 与消息
+### Long-Lived Query and Messages
 
-| 文件 | SDK 公共符号/方法 | 本层职责 |
+| File | Public SDK symbol/method | Responsibility in this layer |
 | --- | --- | --- |
-| [`input-queue.ts`](input-queue.ts) | `SDKUserMessage` | 实现 `AsyncIterable<SDKUserMessage>`，保留 `uuid`、`priority`、`shouldQuery` 与本地取消状态 |
-| [`session-controller.ts`](session-controller.ts) | `Query` 异步迭代、`initializationResult`、`interrupt`、`cancelAsyncMessage`、`close` | 消费输出；以 SDK Session state 为主协调生命周期；管理 fatal/close |
-| [`message-projector.ts`](message-projector.ts) | `SDKMessage`、`SDKResultError` | 把 live Assistant/Tool/Task/Hook/result/system message 投影为语义 action |
-| [`history-projector.ts`](history-projector.ts) | `SessionMessage` | 把公开 Session history 投影为最终 `ConversationItem` |
-| [`product-user-message.ts`](product-user-message.ts) | SDK 用户/控制消息形状 | 把控制回执排除在产品用户文本之外 |
+| [`input-queue.ts`](input-queue.ts) | `SDKUserMessage` | Implement `AsyncIterable<SDKUserMessage>` while preserving `uuid`, `priority`, `shouldQuery`, and local cancellation state |
+| [`session-controller.ts`](session-controller.ts) | Asynchronous `Query` iteration, `initializationResult`, `interrupt`, `cancelAsyncMessage`, `close` | Consume output; coordinate the lifecycle primarily from SDK session state; manage fatal failures and shutdown |
+| [`message-projector.ts`](message-projector.ts) | `SDKMessage`, `SDKResultError` | Project live Assistant/Tool/Task/Hook/result/system messages into semantic actions |
+| [`history-projector.ts`](history-projector.ts) | `SessionMessage` | Project public session history into final `ConversationItem` records |
+| [`product-user-message.ts`](product-user-message.ts) | SDK user/control message forms | Exclude control acknowledgements from product user text |
 
-### Approval、问题与 MCP elicitation
+### Approval, Questions, and MCP Elicitation
 
-| 文件 | SDK 公共符号 | 本层职责 |
+| File | Public SDK symbols | Responsibility in this layer |
 | --- | --- | --- |
-| [`interaction-broker.ts`](interaction-broker.ts) | `CanUseTool`、`OnElicitation`、`ElicitationResult`、`PermissionResult`、`PermissionUpdate` | 保留 callback Promise/abort 合同，并用应用 interaction id 关联浏览器响应 |
-| [`ask-user.ts`](ask-user.ts) | `AskUserQuestion` 的 Tool input/permission shape | 校验和投影结构化问题/答案 |
+| [`interaction-broker.ts`](interaction-broker.ts) | `CanUseTool`, `OnElicitation`, `ElicitationResult`, `PermissionResult`, `PermissionUpdate` | Preserve callback Promise/abort behavior and correlate browser responses through application interaction ids |
+| [`ask-user.ts`](ask-user.ts) | `AskUserQuestion` Tool input/permission form | Validate and project structured questions and answers |
 
-### MCP 与 Hooks
+### MCP and Hooks
 
-| 文件 | SDK 公共符号/方法 | 本层职责 |
+| File | Public SDK symbol/method | Responsibility in this layer |
 | --- | --- | --- |
-| [`demo-mcp-server.ts`](demo-mcp-server.ts) | `createSdkMcpServer`、`tool`、`CallToolResult` | 构建只读 `showcase_project` 进程内 MCP Server |
-| [`mcp-config.ts`](mcp-config.ts) | `McpServerConfig` 及 stdio/SSE/HTTP/tool policy 类型 | 从服务端文件读取并校验 MCP 配置 |
-| [`mcp-service.ts`](mcp-service.ts) | `mcpServerStatus` 与 MCP OAuth/control 方法返回值 | 执行 Session-scoped MCP 控制，并将 status/metadata 脱敏、限量后投影 |
-| [`hooks.ts`](hooks.ts) | `HookCallback`、`HookJSONOutput`、`Options["hooks"]` | 注册 callback 观测；只返回明确需要的 hook output |
+| [`demo-mcp-server.ts`](demo-mcp-server.ts) | `createSdkMcpServer`, `tool`, `CallToolResult` | Build the read-only in-process `showcase_project` MCP server |
+| [`mcp-config.ts`](mcp-config.ts) | `McpServerConfig` plus stdio/SSE/HTTP/tool-policy types | Read and validate MCP configuration from a server-side file |
+| [`mcp-service.ts`](mcp-service.ts) | `mcpServerStatus` and MCP OAuth/control method results | Run session-scoped MCP controls and project status/metadata after redaction and bounding |
+| [`hooks.ts`](hooks.ts) | `HookCallback`, `HookJSONOutput`, `Options["hooks"]` | Register callback observations and return only explicitly required Hook output |
 
-Hook callback 记录与 SDK message stream 的 Hook lifecycle 是两个来源：前者使用 `source: "callback"` / `phase: "observation"`，后者使用 `source: "sdk-event"` 并保留 hook id。不要把它们当成重复项删除。
+Hook callback records and Hook lifecycle records from the SDK message stream are separate sources. The former use `source: "callback"` / `phase: "observation"`; the latter use `source: "sdk-event"` and retain the Hook id. Do not delete them as duplicates.
 
-### 运行时、Task 与 Checkpoint
+### Runtime, Task, and Checkpoint
 
-| 文件 | 使用的 Query 方法 | 本层职责 |
+| File | Query methods used | Responsibility in this layer |
 | --- | --- | --- |
-| [`runtime-capability-service.ts`](runtime-capability-service.ts) | Model、Permission、目录、Context、Account/Usage、Command/Agent/Plugin、Task 与生成标题相关方法 | 在 registry guard 下执行运行时控制并发布应用 event |
-| [`checkpoint-service.ts`](checkpoint-service.ts) | `rewindFiles`、`rewind` | 绑定 dry-run preview、capability、revision 与过期；在 mutation fence 内单次执行 |
-| [`session-registry.ts`](session-registry.ts) | 不直接扩展 SDK surface | 管理 live controller、exclusive/guard/mutation 排序与关闭 |
+| [`runtime-capability-service.ts`](runtime-capability-service.ts) | Methods for Model, Permission, directories, Context, Account/Usage, Command/Agent/Plugin, Task, and title generation | Execute runtime controls under the registry guard and publish application events |
+| [`checkpoint-service.ts`](checkpoint-service.ts) | `rewindFiles`, `rewind` | Bind dry-run previews to capability, revision, and expiration, then execute them once inside the mutation fence |
+| [`session-registry.ts`](session-registry.ts) | Does not directly widen the SDK surface | Manage live controllers, exclusive/guard/mutation ordering, and shutdown |
 
-Task route/service/API Client 和 [`task-details.tsx`](../../client/features/tasks/task-details.tsx) 已适配 `backgroundTasks()` 和 `stopTask()`，但当前 React 产品没有把 Task 设为 details selection 的可达入口，因此用户看不到 Task 控件。维护文档和试用案例必须区分“adapter/组件已存在”和“用户可以从 UI 直接调用”。
+Task routes/services, the API client, and [`task-details.tsx`](../../client/features/tasks/task-details.tsx) adapt `backgroundTasks()` and `stopTask()`, but the current React product has no reachable entry point that sets a Task as the details selection, so users cannot see Task controls. Maintenance documentation and trial cases must distinguish “the adapter/component exists” from “the user can call it directly from the UI.”
 
-### 浏览器安全投影
+### Browser-Safe Projection
 
-下列文件处理从 SDK trust boundary 到浏览器的值，不改变 SDK 行为：
+The following files handle values crossing from the SDK trust boundary to the browser without changing SDK behavior:
 
-| 文件 | 职责 |
+| File | Responsibility |
 | --- | --- |
-| [`redact.ts`](redact.ts) | `redactForBrowser()`、`safeRawPayload()`：credential-shaped 字段脱敏及深度/节点/字节预算 |
-| [`error-text-redact.ts`](error-text-redact.ts) | `boundedErrorText()`：自由格式 SDK 错误限长与凭据替换 |
-| [`browser-projection.ts`](browser-projection.ts) | `safeDiagnosticRecord()` 等稳定 browser-safe 记录 |
+| [`redact.ts`](redact.ts) | `redactForBrowser()`, `safeRawPayload()`: redact credential-shaped fields and enforce depth/node/byte budgets |
+| [`error-text-redact.ts`](error-text-redact.ts) | `boundedErrorText()`: bound free-form SDK errors and replace credentials |
+| [`browser-projection.ts`](browser-projection.ts) | Stable browser-safe records such as `safeDiagnosticRecord()` |
 
-不要把 SDK Query、callback、原始 Tool input、Hook payload、MCP secret/metadata 或未经处理的错误对象直接发送给浏览器。
+Never send SDK Queries, callbacks, raw Tool input, Hook payloads, MCP secrets/metadata, or unprocessed error objects directly to the browser.
 
-## 修改检查单
+## Change Checklist
 
-- SDK import 是否仍只位于本目录？运行 `npm run check:boundary`。
-- 新方法是否真的被 service/controller 调用，还是只为扩大 `QueryPort`？
-- fake 是否只实现应用 port，而没有假装证明真实账号/模型行为？
-- live message 与 restored history 的最终语义是否保持一致？
-- Session close/fatal 后是否停止 input、interaction 与 Query 复用？
-- 新浏览器值是否经过严格 view model、脱敏和大小预算？
-- 有可达产品入口时，是否同时增加 command ownership、局部错误和确定性测试？
+- Are SDK imports still confined to this directory? Run `npm run check:boundary`.
+- Is a new method actually called by a service/controller, or does it only widen `QueryPort`?
+- Does a fake implement only the application port without pretending to prove real account/model behavior?
+- Do live messages and restored history retain equivalent final semantics?
+- After session close/fatal failure, do input, interactions, and Query reuse stop?
+- Does every new browser value pass through a strict view model, redaction, and size budgets?
+- When a reachable product entry point is added, are command ownership, local errors, and deterministic tests added with it?
 
-代表测试位于 [`test/unit/server/sdk/`](../../../test/unit/server/sdk/) 与 [`test/integration/`](../../../test/integration/)；浏览器组装 journey 位于 [`test/e2e/showcase.spec.ts`](../../../test/e2e/showcase.spec.ts)。
+Representative tests are in [`test/unit/server/sdk/`](../../../test/unit/server/sdk/) and [`test/integration/`](../../../test/integration/). The assembled browser journey is in [`test/e2e/showcase.spec.ts`](../../../test/e2e/showcase.spec.ts).

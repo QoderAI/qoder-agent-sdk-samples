@@ -1,24 +1,24 @@
-# Qoder TypeScript Agent SDK 快速开始
+# Qoder TypeScript Agent SDK Quick Start
 
-本文只讲可以从 `@qoder-ai/qoder-agent-sdk` 公共导出直接使用的最小模式。它先给出一个单次 Query，再给出一个可以持续接收用户输入的长生命周期 Query；Web UI Showcase 在这些合同之上增加了 REST/WebSocket、状态投影、并发控制和浏览器安全边界。
+This guide covers the smallest patterns that can be used directly from the public exports of `@qoder-ai/qoder-agent-sdk`. It begins with a single Query and then shows a long-lived Query that continuously accepts user input. Web UI Showcase adds REST/WebSocket transport, state projection, concurrency control, and browser security boundaries on top of these contracts.
 
-示例按本项目当前安装的 `@qoder-ai/qoder-agent-sdk` 1.0.21 和 Node.js 22 编写。
+The examples target the project's currently installed `@qoder-ai/qoder-agent-sdk` 1.0.21 and Node.js 22.
 
-## 准备项目
+## Prepare a Project
 
-在新的 Node.js ESM 项目中安装 SDK。`zod` 是定义 SDK MCP Tool schema 时使用的 peer dependency：
+Install the SDK in a new Node.js ESM project. `zod` is a peer dependency used when defining SDK MCP Tool schemas:
 
 ```bash
 npm install @qoder-ai/qoder-agent-sdk zod
 ```
 
-示例使用本地安装的 `tsx` 运行，并使用 TypeScript 和 Node 类型做静态检查：
+The examples use a local `tsx` installation to run and use TypeScript plus Node types for static checking:
 
 ```bash
 npm install --save-dev tsx typescript @types/node
 ```
 
-`package.json` 至少包含：
+Your `package.json` must contain at least:
 
 ```json
 {
@@ -26,10 +26,10 @@ npm install --save-dev tsx typescript @types/node
 }
 ```
 
-### 选择认证
+### Choose Authentication
 
-- 本机已经通过 qodercli 登录：使用 `qodercliAuth()`。
-- 由服务端环境提供 personal access token：设置 `QODER_PERSONAL_ACCESS_TOKEN`，使用 `accessTokenFromEnv()`。
+- If the machine is already signed in through qodercli, use `qodercliAuth()`.
+- If the server environment provides a personal access token, set `QODER_PERSONAL_ACCESS_TOKEN` and use `accessTokenFromEnv()`.
 
 ```ts
 import {
@@ -42,19 +42,19 @@ const auth = process.env.QODER_PERSONAL_ACCESS_TOKEN
   : qodercliAuth();
 ```
 
-认证对象、token、SDK Query 和回调都应留在受信任的 Node.js 进程。不要把它们放到浏览器 bundle、REST response、localStorage 或客户端日志。
+Keep the authentication object, token, SDK Query, and callbacks inside a trusted Node.js process. Do not place them in a browser bundle, REST response, localStorage, or client-side log.
 
-## 单次 Query
+## Single Query
 
-预计用时：5 分钟。
+Estimated time: 5 minutes.
 
-创建 `one-shot.ts`：
+Create `one-shot.ts`:
 
 ```ts
 import { qodercliAuth, query } from "@qoder-ai/qoder-agent-sdk";
 
 const prompt =
-  process.argv.slice(2).join(" ") || "用三点说明这个项目的主要目录。";
+  process.argv.slice(2).join(" ") || "Describe the three main directories in this project.";
 
 const q = query({
   prompt,
@@ -82,21 +82,21 @@ try {
 }
 ```
 
-运行：
+Run it:
 
 ```bash
-npx tsx one-shot.ts "只读取当前目录并概括 package.json 的用途。"
+npx tsx one-shot.ts "Read only the current directory and summarize the purpose of package.json."
 ```
 
-这个例子有五个不可省略的边界：
+This example has five essential boundaries:
 
-1. `query()` 是 Query 的创建入口。
-2. `auth` 和 `cwd` 由服务端决定；`cwd` 是 Agent 可以工作的项目根目录。
-3. `Query` 是 `AsyncIterable<SDKMessage>`，必须使用 `for await` 消费消息。
-4. 不要把每种 SDK 消息都当作最终 Assistant 文本；这里显式筛选 `assistant` 和 `text` block。
-5. 无论正常完成还是异常退出，都在 `finally` 中 `await q.close()`。
+1. `query()` is the Query creation entry point.
+2. The server decides `auth` and `cwd`; `cwd` is the project root in which the Agent may work.
+3. A `Query` is an `AsyncIterable<SDKMessage>` and must be consumed with `for await`.
+4. Do not treat every SDK message as final Assistant text. This example explicitly filters for `assistant` messages and `text` blocks.
+5. Call `await q.close()` in `finally`, whether execution completes normally or exits with an error.
 
-如需 token 认证，只替换 import 和 `auth`：
+For token authentication, replace only the import and `auth`:
 
 ```ts
 import {
@@ -105,7 +105,7 @@ import {
 } from "@qoder-ai/qoder-agent-sdk";
 
 const q = query({
-  prompt: "检查当前项目。",
+  prompt: "Inspect the current project.",
   options: {
     auth: accessTokenFromEnv(),
     cwd: process.cwd(),
@@ -113,15 +113,15 @@ const q = query({
 });
 ```
 
-`accessTokenFromEnv()` 读取服务端环境。不要把 token 作为 prompt、浏览器字段或日志内容传入。
+`accessTokenFromEnv()` reads the server environment. Do not pass the token through a prompt, browser field, or log message.
 
-## 长生命周期交互 Query
+## Long-Lived Interactive Query
 
-预计用时：15 分钟。
+Estimated time: 15 minutes.
 
-聊天、WebSocket 或队列消费者不能把每条用户消息都变成一个新的 Query。应创建一个 `AsyncIterable<SDKUserMessage>`，持续向同一个 Query 输入消息，同时在另一条异步任务中持续消费 SDK 输出。
+A chat application, WebSocket service, or queue consumer should not turn every user message into a new Query. Create an `AsyncIterable<SDKUserMessage>` that continuously feeds messages into one Query while a separate asynchronous task continuously consumes SDK output.
 
-下面的 `interactive.ts` 是完整的终端示例。它的队列只支持一个 SDK consumer，足以展示 Web 服务需要实现的核心合同：
+The following `interactive.ts` is a complete terminal example. Its queue supports a single SDK consumer, which is enough to demonstrate the core contract a Web service must implement:
 
 ```ts
 import { randomUUID } from "node:crypto";
@@ -248,8 +248,8 @@ const outputTask = (async () => {
 })();
 
 try {
-  console.log("输入消息；/now、/later、/note 可改变下一条消息的语义。");
-  console.log("/interrupt 中断当前 turn，/cancel 取消上一条消息，/exit 退出。\n");
+  console.log("Enter a message; /now, /later, and /note change the next message's semantics.");
+  console.log("/interrupt stops the current turn, /cancel cancels the previous message, and /exit quits.\n");
 
   for await (const rawLine of terminal) {
     const line = rawLine.trim();
@@ -263,13 +263,13 @@ try {
 
     if (line === "/cancel") {
       if (lastUuid === undefined) {
-        console.error("没有可取消的消息。");
+        console.error("There is no message to cancel.");
         continue;
       }
       const cancelledLocally = input.cancel(lastUuid);
       const cancelled =
         cancelledLocally || (await q.cancelAsyncMessage(lastUuid));
-      console.error(cancelled ? "消息已取消。" : "消息已无法取消。");
+      console.error(cancelled ? "Message cancelled." : "The message can no longer be cancelled.");
       if (cancelled) lastUuid = undefined;
       continue;
     }
@@ -290,48 +290,48 @@ try {
 if (outputError !== undefined) throw outputError;
 ```
 
-运行：
+Run it:
 
 ```bash
 npx tsx interactive.ts
 ```
 
-可以输入：
+Try these inputs:
 
 ```text
-总结当前项目，只读取文件。
-/later 等当前回复结束后，只回复 LATER_OK。
-/now 立即停止当前回复，只回复 NOW_OK。
-/note 这是写入对话但不自行触发模型 turn 的说明。
+Summarize the current project. Read files only.
+/later After the current response finishes, reply with LATER_OK only.
+/now Stop the current response immediately and reply with NOW_OK only.
+/note This note is added to the conversation without starting a model turn by itself.
 /cancel
 /interrupt
 /exit
 ```
 
-### `priority` 与 `shouldQuery`
+### `priority` and `shouldQuery`
 
-| 字段 | 语义 |
+| Field | Meaning |
 | --- | --- |
-| `priority: "now"` | 中断活跃回复并尽快处理该输入 |
-| `priority: "next"` | 默认值；在下一个合适的安全点处理 |
-| `priority: "later"` | 等当前回复结束并进入可处理状态 |
-| `shouldQuery: false` | 把消息加入对话，但不由该消息自行启动模型 turn；交付时点仍服从 `priority` |
+| `priority: "now"` | Interrupt the active response and process this input as soon as possible |
+| `priority: "next"` | Default; process at the next appropriate safe point |
+| `priority: "later"` | Wait for the current response to finish and the session to become ready |
+| `shouldQuery: false` | Add the message to the conversation without letting that message start a model turn by itself; delivery timing still follows `priority` |
 
-每个可追踪或可取消的异步消息都应使用 Session 内不重复的 `uuid`。上例先尝试从应用本地队列取消；如果消息已经被 `AsyncIterable` yield 给 SDK，再调用 `cancelAsyncMessage(uuid)`。
+Every asynchronous message that must be tracked or cancelled should use a `uuid` that is unique within the session. The example first tries to cancel the message in the application's local queue. If the `AsyncIterable` has already yielded the message to the SDK, it calls `cancelAsyncMessage(uuid)` instead.
 
-### 不要虚构“一条输入对应一个 result”
+### Do Not Invent a One-Input-to-One-Result Relationship
 
-- 应用队列把消息 yield 给 SDK，只能证明输入已交付到 SDK transport，不能证明一个 turn 已完成。
-- SDK 可以合并多条异步输入；result 消息也不携带唯一的来源输入 UUID。
-- `cancelAsyncMessage(uuid)` 返回 `true` 表示队列消息被取消；返回 `false` 表示已经无法取消，不等于 Session 失败。
-- `interrupt()` 只中断当前工作，不关闭 Query。应根据 receipt 中的 `still_queued` 和可选 `cancelled` UUID 协调应用队列。
-- 如果运行时提供 `session_state_changed`，`idle`、`running`、`requires_action` 才是 Session 生命周期的主要证据；不要只凭任意 result 清空全部输入或强制设为 idle。
+- Yielding a message from the application queue to the SDK proves only that the input reached the SDK transport; it does not prove that a turn completed.
+- The SDK may combine multiple asynchronous inputs, and result messages do not carry a unique source-input UUID.
+- `cancelAsyncMessage(uuid)` returning `true` means the queued message was cancelled. Returning `false` means it can no longer be cancelled; it does not mean the session failed.
+- `interrupt()` interrupts current work without closing the Query. Coordinate the application queue using `still_queued` and the optional `cancelled` UUIDs in the receipt.
+- If the runtime provides `session_state_changed`, `idle`, `running`, and `requires_action` are the primary session-lifecycle evidence. Do not clear all inputs or force the session to idle based only on an arbitrary result.
 
-Showcase 对应实现位于 [`input-queue.ts`](../src/server/sdk/input-queue.ts) 和 [`session-controller.ts`](../src/server/sdk/session-controller.ts)。产品 Composer 默认使用 `next` / `true`，但应用 port 保留完整字段。
+The Showcase implementation is in [`input-queue.ts`](../src/server/sdk/input-queue.ts) and [`session-controller.ts`](../src/server/sdk/session-controller.ts). The product Composer defaults to `next` / `true`, while the application port preserves both fields in full.
 
-## 新建、恢复与 Fork Session
+## Create, Resume, and Fork Sessions
 
-Query 创建时只选择一种意图：
+Choose exactly one intent when creating a Query:
 
 ```ts
 const created = query({
@@ -363,31 +363,31 @@ const forked = query({
 });
 ```
 
-- `sessionId` 让 host 为新 Session 指定标识。
-- `resume` 恢复已有 Session；host 应确保 `cwd` 和 Session 所属 Workspace 一致。
-- `forkSession: true` 与 `resume` 一起使用，从已有历史创建新分支，不应覆盖原 Session。
-- 每个 Query 都有独立生命周期。当 host 不再保留某个 Query，例如关闭、重启或删除 Session，或者采用单活 Session 策略并切换目标时，应先停止接收新命令，再 `await q.close()`；不要在 fatal transport/output 后继续复用旧 Query。
+- `sessionId` lets the host assign an identifier to a new session.
+- `resume` restores an existing session. The host should ensure that `cwd` matches the session's Workspace.
+- `forkSession: true` is used with `resume` to create a new branch from existing history; it must not overwrite the original session.
+- Every Query has an independent lifecycle. When the host no longer retains a Query—for example, when closing, restarting, or deleting a session, or when switching targets under a single-active-session policy—stop accepting new commands before calling `await q.close()`. Do not continue reusing an old Query after a fatal transport or output failure.
 
-## 回调与浏览器边界
+## Callbacks and the Browser Boundary
 
-完整 Web 产品通常还需要：
+A complete Web product usually also needs:
 
-- `canUseTool`：把 SDK 的权限 Promise 映射为产品 Approval，并响应 SDK abort signal。
-- `onElicitation`：把 MCP form/URL 请求映射为结构化产品交互。
-- `hooks`：做观测、策略或上下文注入，不要把 Hook payload 原样发到浏览器。
-- `mcpServers`：远程 headers、子进程环境和 OAuth token 只由服务端持有；授权 URL 可以按产品策略显示给用户，用户提交的 callback URL 只用于一次服务端控制请求，不应写入持久客户端状态或诊断事件。
-- `includePartialMessages`：将增量输出投影为稳定语义项，而不是把每个 delta 追加成新消息。
+- `canUseTool`: map the SDK permission Promise to a product Approval and respond to the SDK abort signal.
+- `onElicitation`: map an MCP form/URL request to a structured product interaction.
+- `hooks`: provide observation, policy, or context injection without sending Hook payloads directly to the browser.
+- `mcpServers`: keep remote headers, subprocess environments, and OAuth tokens on the server. An authorization URL may be displayed according to product policy, while a user-submitted callback URL should be used for one server-side control request only and must not be written to persistent client state or diagnostic events.
+- `includePartialMessages`: project incremental output into stable semantic items instead of appending every delta as a new message.
 
-这些选项在 Showcase 的唯一 Query 创建点 [`query-factory.ts`](../src/server/sdk/query-factory.ts) 统一组合。其片段依赖应用自己的 `InputQueue`、`InteractionBroker`、配置和 MCP/Hook 注册，不是可以脱离项目复制的 Quick Start。
+These options are composed at the Showcase's single Query creation point, [`query-factory.ts`](../src/server/sdk/query-factory.ts). That fragment depends on the application's own `InputQueue`, `InteractionBroker`, configuration, and MCP/Hook registrations, so it is not a standalone Quick Start example.
 
-## SDK 合同与 Showcase 额外工作
+## SDK Contracts and Additional Showcase Work
 
-| 内容 | SDK 公共合同 | Showcase 负责 |
+| Area | Public SDK contract | Showcase responsibility |
 | --- | --- | --- |
-| Query 生命周期 | `query()`、异步消息迭代、`close()` | registry、自动 availability、失败重建、graceful shutdown |
-| 输入 | `AsyncIterable<SDKUserMessage>`、priority、`shouldQuery`、cancel/interrupt | 本地队列状态、命令关联、保守批次协调、界面提示 |
-| Session | `sessionId`、`resume`、`forkSession` 和 catalog API | Workspace 绑定、并发去重、snapshot/history 一致性 |
-| 浏览器 | SDK 返回消息和回调 | Zod wire model、语义投影、脱敏、大小预算、REST/WebSocket 恢复 |
-| Checkpoint | `rewindFiles()`、`rewind()` | dry-run UI、revision 绑定、单次预览、mutation fence、权威历史替换 |
+| Query lifecycle | `query()`, asynchronous message iteration, `close()` | Registry, automatic availability, failure reconstruction, graceful shutdown |
+| Input | `AsyncIterable<SDKUserMessage>`, priority, `shouldQuery`, cancel/interrupt | Local queue state, command correlation, conservative batch coordination, UI feedback |
+| Session | `sessionId`, `resume`, `forkSession`, and catalog APIs | Workspace binding, concurrent-request deduplication, snapshot/history consistency |
+| Browser | SDK-returned messages and callbacks | Zod wire model, semantic projection, redaction, size budgets, REST/WebSocket recovery |
+| Checkpoint | `rewindFiles()`, `rewind()` | Dry-run UI, revision binding, single-use previews, mutation fence, authoritative history replacement |
 
-下一步阅读 [SDK 代码导览](SDK_CODE_TOUR.md#一条消息如何穿过系统)，沿一条浏览器消息追踪到 `query()`、SDK message stream 和客户端 reducer；要验证产品表现则使用[产品试用手册](PRODUCT_TRIAL_GUIDE.md)。
+Next, read [SDK Code Tour](SDK_CODE_TOUR.md#how-a-message-moves-through-the-system) to follow one browser message through `query()`, the SDK message stream, and the client reducer. Use the [Product Trial Guide](PRODUCT_TRIAL_GUIDE.md) to verify product behavior.
