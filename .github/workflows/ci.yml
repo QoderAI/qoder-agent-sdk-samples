@@ -21,7 +21,7 @@ jobs:
       - run: npm ci
         working-directory: typescript
       - run: npx playwright install --with-deps chromium
-        working-directory: typescript
+        working-directory: typescript/web-ui-showcase
       - run: npm run check --workspaces
         working-directory: typescript
 
