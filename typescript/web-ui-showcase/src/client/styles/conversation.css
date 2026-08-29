@@ -1,0 +1,64 @@
+.message-list { min-height: 0; flex: 1; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; padding: 22px max(24px, calc((100% - var(--chat-content-width)) / 2)); }
+.message-list > * { width: min(100%, var(--chat-content-width)); margin-right: auto; margin-left: auto; }
+.message-card, .interaction-card { margin-bottom: 16px; }
+.message-card { padding: 0; }
+.message-card p { margin: 4px 0; line-height: 1.65; white-space: pre-wrap; }
+.message-card.user { position: relative; width: fit-content; max-width: 78%; margin-right: 0; border-radius: 14px; padding: 9px 13px; background: var(--bg-selected); }
+.message-actions { display: flex; justify-content: flex-end; margin: 5px -4px -4px; }
+.message-action { border: 0; border-radius: 6px; padding: 3px 5px; background: transparent; color: var(--label-secondary); font: inherit; font-size: 11px; cursor: pointer; }
+.message-action:hover { background: var(--bg-hover); color: var(--business-primary); }
+.message-action:focus-visible { outline: 2px solid var(--business-primary); outline-offset: 1px; }
+.message-card.assistant { max-width: 100%; }
+.message-card.progress { border-radius: 8px; padding: 8px 10px; color: var(--label-secondary); background: var(--bg-muted); }
+.message-card.error { border: 1px solid #efc6ca; border-radius: 10px; padding: 10px 12px; background: var(--danger-surface); }
+.message-status { display: block; margin-top: 5px; color: var(--label-secondary); }
+.streaming-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--business-primary); animation: pulse 1s infinite alternate; }
+@keyframes pulse { to { opacity: 0.25; } }
+.tool-card {
+  margin: 0 0 10px;
+  padding: 6px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--bg-muted);
+}
+.tool-row { display: grid; width: 100%; min-height: 32px; align-items: center; gap: 8px; border: 0; border-radius: 7px; padding: 4px 8px 4px 3px; overflow: hidden; background: transparent; text-align: left; cursor: pointer; }
+.tool-row { grid-template-columns: auto minmax(0, 1fr) auto auto; }
+.tool-row:hover { background: var(--bg-hover); }
+.tool-row[aria-expanded="true"] { background: var(--bg-selected); }
+.tool-row strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tool-row-icon { color: var(--business-primary); font-size: 18px; transition: transform 120ms ease; }
+.tool-row[aria-expanded="true"] .tool-row-icon { transform: rotate(90deg); }
+.tool-inline-details { margin: 4px 8px 12px 28px; padding: 12px; border: 1px solid var(--border-subtle); border-radius: 8px; background: var(--bg-muted); }
+.status-pill { border-radius: 999px; padding: 2px 7px; background: var(--bg-hover); color: var(--label-secondary); font-size: 11px; }
+.status-pill.completed { color: #287548; background: #eaf7ef; }
+.status-pill.failed { color: var(--danger); background: var(--danger-surface); }
+.tool-details { display: grid; gap: 12px; }
+.tool-details dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 0; }
+.tool-details dl div { display: grid; min-width: 0; gap: 2px; }
+.tool-details dt, .tool-details h4 { color: var(--label-primary); font-size: 12px; font-weight: 600; }
+.tool-details dd { min-width: 0; margin: 0; overflow-wrap: anywhere; color: var(--label-secondary); font-size: 12px; }
+.tool-payloads { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.tool-payloads section { min-width: 0; }
+.tool-payloads h4 { margin: 0 0 5px; }
+.tool-payloads p { color: var(--label-secondary); font-size: 12px; }
+.schema-preview, .safe-json { max-height: 220px; overflow: auto; border: 1px solid var(--border-subtle); border-radius: 8px; padding: 10px; background: var(--bg-muted); color: #4f5966; font-size: 12px; }
+.interaction-card { border: 1px solid #ead8aa; border-radius: 12px; padding: 13px 14px; background: var(--warning-surface); }
+.interaction-card header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.interaction-card header span { color: var(--warning); font-size: 11px; font-weight: 700; }
+.interaction-actions { display: flex; flex-wrap: wrap; gap: 7px; margin: 12px 0; }
+.mcp-form-fields { display: grid; flex: 1 0 100%; gap: 10px; }
+.mcp-form-fields label { display: grid; gap: 5px; }
+.mcp-form-fields input, .mcp-form-fields select { box-sizing: border-box; width: 100%; }
+.mcp-form-fields small { color: var(--label-secondary); }
+.interaction-actions > .form-error { flex-basis: 100%; margin: 0; }
+.compact-field { display: grid; gap: 4px; color: var(--label-secondary); font-size: 12px; }
+.compact-field input, .interaction-card input { border: 1px solid var(--border-strong); border-radius: 8px; padding: 8px; background: var(--bg-base); }
+.check-field { display: inline-flex; align-items: center; gap: 6px; color: var(--label-secondary); font-size: 13px; }
+.interaction-card fieldset { border: 1px solid #ead9b5; border-radius: 8px; margin: 10px 0; padding: 10px; }
+.interaction-card fieldset .check-field { display: flex; margin: 6px 0; }
+.inline-runtime { padding: 0; }
+@media (max-width: 639px) {
+  .message-list { padding-right: 16px; padding-left: 16px; }
+  .message-card.user { max-width: 90%; }
+  .tool-payloads, .tool-details dl { grid-template-columns: minmax(0, 1fr); }
+}

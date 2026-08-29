@@ -1,0 +1,73 @@
+:root {
+  color-scheme: light;
+  --sidebar-default: 280px;
+  --sidebar-collapsed: 56px;
+  --details-default: 360px;
+  --chat-content-width: 748px;
+  --composer-card-width: 780px;
+  --bg-base: #ffffff;
+  --bg-sidebar: #f6f7f8;
+  --bg-muted: #f7f8fa;
+  --bg-hover: #eceef1;
+  --bg-selected: #e8efff;
+  --border-subtle: rgba(31, 35, 40, 0.1);
+  --border-strong: rgba(31, 35, 40, 0.18);
+  --label-primary: #25282d;
+  --label-secondary: #626871;
+  --label-caption: #9aa0a8;
+  --business-primary: #336df4;
+  --business-hover: #245ce0;
+  --danger: #bd3445;
+  --danger-surface: #fff2f4;
+  --warning: #8a6114;
+  --warning-surface: #fff9eb;
+  --shadow-floating: 0 12px 36px rgba(26, 31, 39, 0.14);
+  --shadow-dialog: 0 24px 72px rgba(26, 31, 39, 0.2);
+  --bg: var(--bg-base);
+  --surface: var(--bg-base);
+  --surface-muted: var(--bg-muted);
+  --surface-blue: var(--bg-selected);
+  --line: var(--border-subtle);
+  --line-strong: var(--border-strong);
+  --text: var(--label-primary);
+  --muted: var(--label-secondary);
+  --primary: var(--business-primary);
+  --primary-strong: var(--business-hover);
+  --primary-ink: #ffffff;
+  font-family: Inter, "PingFang SC", "Microsoft YaHei", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: var(--bg-base);
+  color: var(--label-primary);
+}
+
+* { box-sizing: border-box; }
+html, body, #root { width: 100%; height: 100%; overflow: hidden; }
+body { margin: 0; min-width: 320px; background: var(--bg-base); }
+button, input, textarea, select { font: inherit; }
+button { color: inherit; }
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+summary:focus-visible,
+[role="separator"]:focus-visible {
+  outline: 2px solid var(--business-primary);
+  outline-offset: 2px;
+}
+.button, .icon-button, .menu-panel button { border: 1px solid var(--border-strong); border-radius: 8px; background: var(--bg-base); cursor: pointer; transition: background-color 120ms ease, border-color 120ms ease, box-shadow 120ms ease; }
+.button { min-height: 34px; padding: 6px 12px; font-weight: 500; }
+.button:hover, .icon-button:hover, .menu-panel button:hover { background: var(--bg-hover); }
+.button.primary { border-color: var(--business-primary); background: var(--business-primary); color: #fff; }
+.button.primary:hover { border-color: var(--business-hover); background: var(--business-hover); }
+.button.danger { border-color: #efc6ca; color: var(--danger); background: var(--danger-surface); }
+.button:disabled { cursor: not-allowed; opacity: 0.46; }
+.icon-button { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border-color: transparent; border-radius: 999px; }
+.wide { width: 100%; }
+.danger-text, .error-text { color: var(--danger) !important; }
+.text-button { border: 0; padding: 0; background: transparent; color: var(--business-primary); cursor: pointer; }
+.form-error { margin: 6px 0; color: var(--danger); font-size: 13px; }
+.source-label { display: inline-block; color: var(--label-caption); font-family: ui-monospace, SFMono-Regular, monospace; font-size: 11px; }
+.stack-actions, .details-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+}

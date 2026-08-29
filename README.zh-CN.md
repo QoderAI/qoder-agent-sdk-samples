@@ -3,6 +3,12 @@
 本仓库提供面向实际开发者的 Qoder Agent SDK 示例。每个场景同时提供
 TypeScript 和 Python 实现。
 
+## 应用样板
+
+| 样板 | 展示内容 | 语言 |
+| --- | --- | --- |
+| [Web UI showcase](typescript/web-ui-showcase) | 中文浅色界面的本地项目 Agent；连续流式消息聚合显示，审批位于主界面，并覆盖 Session、MCP、Hooks、Task、Credits、Checkpoint、错误、退出和恢复 | TypeScript |
+
 ## 示例列表
 
 | 示例 | 展示内容 | TypeScript | Python |

@@ -12,6 +12,7 @@
     "hooks",
     "custom-tools",
     "subagents",
-    "external-session-storage"
+    "external-session-storage",
+    "web-ui-showcase"
   ]
 }

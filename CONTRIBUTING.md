@@ -28,6 +28,8 @@ this repository.
 
 ## Sample requirements
 
+### Focused samples
+
 Every sample must:
 
 - Demonstrate one primary SDK concept.
@@ -62,6 +64,10 @@ kebab-case sample name.
 Keep the TypeScript and Python versions behaviorally equivalent so readers can
 switch between languages. When one concept has multiple independently copyable
 variants, keep them in one sample directory and list every entry in its README.
+
+### Comprehensive application templates
+
+An application template may be language-specific when its framework and application architecture are part of what it teaches. It must demonstrate one coherent end-to-end application, keep SDK calls easy to locate, document module ownership, provide deterministic credential-free tests, and include an opt-in real-SDK smoke path.
 
 ## Running the checks
 

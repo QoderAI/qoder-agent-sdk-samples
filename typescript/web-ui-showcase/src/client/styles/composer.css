@@ -1,0 +1,36 @@
+.composer-wrap { position: relative; z-index: 3; width: 100%; flex: 0 0 auto; padding: 36px max(16px, calc((100% - var(--composer-card-width)) / 2)) 18px; background: linear-gradient(180deg, rgba(255,255,255,0), var(--bg-base) 36px); }
+.composer-hero { width: min(100%, calc(var(--composer-card-width) + 32px)); margin: 8px auto 0; padding: 8px 16px 0; background: transparent; }
+.prompt-composer { width: min(100%, var(--composer-card-width)); margin: 0 auto; border: 1px solid var(--border-strong); border-radius: 22px; padding: 10px 12px 9px; background: var(--bg-base); box-shadow: 0 6px 24px rgba(26, 31, 39, 0.09); }
+.prompt-composer:focus-within { border-color: #91adf4; box-shadow: 0 0 0 3px rgba(51,109,244,0.1), 0 6px 24px rgba(26,31,39,0.09); }
+.prompt-composer textarea { width: 100%; min-height: 52px; max-height: 336px; resize: vertical; border: 0; outline: 0; padding: 5px 4px; background: transparent; color: var(--label-primary); line-height: 1.5; }
+.prompt-composer footer { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
+.runtime-control-stack { display: grid; min-width: 0; flex: 1; gap: 4px; }
+.runtime-controls { display: flex; min-width: 0; flex: 1; align-items: center; gap: 2px; overflow-x: auto; }
+.composer-runtime-select { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 4px; color: var(--label-secondary); font-size: 11px; white-space: nowrap; }
+.composer-runtime-select select { max-width: 144px; min-height: 28px; border: 1px solid transparent; border-radius: 8px; padding: 3px 24px 3px 7px; background-color: transparent; color: var(--label-secondary); font-size: 12px; cursor: pointer; }
+.composer-runtime-select select:hover, .composer-runtime-select select:focus { border-color: var(--border-subtle); background-color: var(--bg-muted); outline: 0; }
+.composer-runtime-select select:disabled { cursor: not-allowed; opacity: 0.58; }
+.composer-runtime-select small { display: none; }
+.runtime-control-stack > .form-error, .runtime-control-stack > .command-failure-notice { margin: 0; font-size: 12px; }
+.context-meter { align-self: center; color: var(--label-secondary); font-size: 12px; white-space: nowrap; }
+.composer-suggestions { position: absolute; right: max(16px, calc((100% - var(--composer-card-width)) / 2)); bottom: calc(100% - 34px); left: max(16px, calc((100% - var(--composer-card-width)) / 2)); z-index: 8; display: grid; max-height: min(300px, 42vh); gap: 2px; overflow-y: auto; overflow-x: hidden; border: 1px solid var(--border-subtle); border-radius: 12px; padding: 5px; background: var(--bg-base); box-shadow: var(--shadow-floating); }
+.composer-hero .composer-suggestions { right: 16px; left: 16px; }
+.composer-suggestions > button { display: grid; width: 100%; gap: 3px; border: 0; border-radius: 8px; padding: 8px 10px; background: transparent; color: var(--label-primary); text-align: left; cursor: pointer; }
+.composer-suggestions > button:hover, .composer-suggestions > button[aria-selected="true"] { background: var(--bg-selected); }
+.composer-suggestions > button span { display: flex; min-width: 0; align-items: baseline; gap: 8px; }
+.composer-suggestions > button strong { overflow-wrap: anywhere; }
+.composer-suggestions code, .composer-suggestions small, .composer-suggestion-status { color: var(--label-secondary); font-size: 12px; }
+.composer-suggestion-status { margin: 6px 8px; }
+.composer-prompt-suggestions { display: flex; flex-wrap: wrap; width: min(100%, var(--composer-card-width)); margin: 0 auto 8px; gap: 6px; }
+.composer-prompt-suggestions button { flex: 0 0 auto; border: 1px solid var(--border-subtle); border-radius: 999px; padding: 5px 9px; background: var(--bg-base); color: var(--label-secondary); cursor: pointer; }
+.queue-strip { display: flex; width: min(100%, var(--composer-card-width)); margin: 0 auto 8px; gap: 8px; overflow-x: auto; }
+.queue-strip span { flex: 0 0 auto; border: 1px solid var(--border-subtle); border-radius: 8px; padding: 5px 8px; background: var(--bg-muted); color: var(--label-secondary); font-size: 12px; }
+.queue-strip button { margin-left: 6px; border: 0; background: transparent; color: var(--danger); cursor: pointer; }
+.composer-wrap > .form-error { width: min(100%, var(--composer-card-width)); margin-right: auto; margin-left: auto; }
+@media (max-width: 639px) {
+  .composer-wrap { padding-right: 12px; padding-bottom: max(12px, env(safe-area-inset-bottom)); padding-left: 12px; }
+  .composer-hero { padding-right: 0; padding-left: 0; }
+  .composer-suggestions { right: 12px; left: 12px; }
+  .prompt-composer { border-radius: 18px; }
+  .prompt-composer footer { align-items: flex-end; }
+}
