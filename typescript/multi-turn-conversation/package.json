@@ -4,10 +4,11 @@
   "type": "module",
   "scripts": {
     "start": "tsx index.ts",
-    "check": "tsc --noEmit --target ES2022 --module NodeNext --moduleResolution NodeNext --types node index.ts"
+    "check": "tsc --noEmit --strict --target ES2022 --module NodeNext --moduleResolution NodeNext --types node index.ts tool-observer.test.ts permissions.test.ts && npm test",
+    "test": "tsx --test tool-observer.test.ts permissions.test.ts"
   },
   "dependencies": {
-    "@qoder-ai/qoder-agent-sdk": "^1.0.16"
+    "@qoder-ai/qoder-agent-sdk": "^1.0.56"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
