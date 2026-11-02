@@ -3,8 +3,8 @@ import test from "node:test";
 import { ToolObserver } from "./tool-observer.js";
 
 const use = (id: string) => ({
-  type: "assistant",
-  message_source: "host_tool",
+  type: "system",
+  subtype: "host_tool_use",
   code_mode_tool_use_id: "exec",
   parent_tool_use_id: "agent",
   message: {
@@ -13,7 +13,7 @@ const use = (id: string) => ({
 });
 const result = (id: string, content: string, is_error = false) => ({
   ...use(id),
-  type: "user",
+  subtype: "host_tool_result",
   message: {
     content: [{ type: "tool_result", tool_use_id: id, content, is_error }],
   },

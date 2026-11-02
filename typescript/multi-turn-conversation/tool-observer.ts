@@ -42,7 +42,9 @@ export class ToolObserver {
   observe(value: unknown, replay = false): boolean {
     const message = record(value);
     if (!message) return false;
-    const host = message.message_source === "host_tool";
+    const hostUse = message.type === "system" && message.subtype === "host_tool_use";
+    const hostResult = message.type === "system" && message.subtype === "host_tool_result";
+    const host = hostUse || hostResult;
     const root =
       typeof message.code_mode_tool_use_id === "string"
         ? message.code_mode_tool_use_id
@@ -72,7 +74,7 @@ export class ToolObserver {
       const block = record(item);
       if (!block) continue;
       if (
-        message.type === "assistant" &&
+        (hostUse || message.type === "assistant") &&
         block.type === "tool_use" &&
         typeof block.id === "string"
       ) {
@@ -88,7 +90,7 @@ export class ToolObserver {
           this.calls.set(call.id, call);
           if (!replay) this.show(call);
         }
-      } else if (message.type === "user" && block.type === "tool_result") {
+      } else if ((hostResult || message.type === "user") && block.type === "tool_result") {
         // 原生历史消息可能包含多个结果，side-channel 与结果块按下标对应。
         const side =
           results.length > 1 && Array.isArray(message.tool_use_result)

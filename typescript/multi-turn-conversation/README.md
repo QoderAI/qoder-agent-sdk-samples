@@ -45,7 +45,7 @@ npm link
 npm link --no-save --package-lock=false @qoder-ai/qoder-agent-sdk
 ```
 
-The matching CLI must emit `message_source: "host_tool"`,
+The matching CLI must emit `system/host_tool_use` and `system/host_tool_result` events,
 `code_mode_tool_use_id`, and `tool_use_result.calls[].hostResult`. Select that
 CLI build explicitly:
 
