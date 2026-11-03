@@ -12,6 +12,7 @@ import com.qoder.sdk.message.ResultOutcome;
 import com.qoder.sdk.message.SdkMessage;
 import com.qoder.sdk.model.ModelId;
 import com.qoder.sdk.model.ModelSelection;
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;

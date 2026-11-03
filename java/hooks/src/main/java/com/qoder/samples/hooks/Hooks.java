@@ -6,18 +6,20 @@ import com.qoder.sdk.QoderClient;
 import com.qoder.sdk.QoderQuery;
 import com.qoder.sdk.SessionOptions;
 import com.qoder.sdk.auth.Auth;
+import com.qoder.sdk.hook.HookEvent;
+import com.qoder.sdk.hook.HookRegistration;
+import com.qoder.sdk.json.JsonObject;
+import com.qoder.sdk.json.JsonString;
+import com.qoder.sdk.json.JsonValue;
 import com.qoder.sdk.message.AssistantMessage;
 import com.qoder.sdk.message.ResultMessage;
 import com.qoder.sdk.message.ResultOutcome;
 import com.qoder.sdk.message.SdkMessage;
 import com.qoder.sdk.model.ModelId;
 import com.qoder.sdk.model.ModelSelection;
-import com.qoder.sdk.hook.HookEvent;
-import com.qoder.sdk.hook.HookRegistration;
-import com.qoder.sdk.json.JsonObject;
-import com.qoder.sdk.json.JsonString;
-import com.qoder.sdk.json.JsonValue;
+
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -70,7 +72,7 @@ public final class Hooks {
     }
 
     List<HookRegistration> registrations() {
-        java.util.ArrayList<HookRegistration> result = new java.util.ArrayList<HookRegistration>();
+        List<HookRegistration> result = new ArrayList<HookRegistration>();
         for (String name : EVENTS) {
             HookRegistration.Builder builder = HookRegistration.builder().event(name).handler(event -> {
                 counts.get(name).incrementAndGet();

@@ -1,15 +1,27 @@
 package com.qoder.samples.models;
-import com.qoder.sdk.json.*;
-import com.qoder.sdk.model.*;
+
+import com.qoder.sdk.json.JsonValue;
+import com.qoder.sdk.model.ModelId;
+import com.qoder.sdk.model.ModelInfo;
+import com.qoder.sdk.model.ModelPolicyResult;
 import org.junit.Test;
-import java.util.*;
-import static org.junit.Assert.*;
+
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertTrue;
 
 public class ModelSelectionSampleTest {
     private static ModelInfo model(boolean enabled, String metadata) {
         return ModelInfo.of(ModelId.of("test-model"), "Test", null, enabled, JsonValue.parse(metadata));
     }
-    @Test public void combinesCatalogFormatsAndUsesAdvertisedDefaults() {
+
+    @Test
+    public void combinesCatalogFormatsAndUsesAdvertisedDefaults() {
         ModelSelectionSample.Choices choices = new ModelSelectionSample.Choices(model(true,
                 "{\"availableContextWindows\":[8000,16000],\"context_config\":{\"large\":{\"token_count\":32000,\"is_default\":true}},"
                 + "\"efforts\":[\"low\"],\"thinking_config\":{\"enabled\":{\"efforts\":{\"high\":{\"is_default\":true},\"low\":{}}}}}"));
@@ -18,7 +30,9 @@ public class ModelSelectionSampleTest {
         assertEquals(Arrays.asList("low", "high"), choices.efforts);
         assertEquals("high", choices.defaultEffort);
     }
-    @Test public void ignoresMalformedMetadataAndUnadvertisedDefaults() {
+
+    @Test
+    public void ignoresMalformedMetadataAndUnadvertisedDefaults() {
         ModelSelectionSample.Choices choices = new ModelSelectionSample.Choices(model(true,
                 "{\"availableContextWindows\":[0,-1,1.5,\"8000\",8000,8000,1e50],\"defaultContextWindow\":999,"
                 + "\"context_config\":{\"bad\":null},\"efforts\":[3,\"\",\"low\"],\"defaultEffort\":\"missing\"}"));
@@ -28,13 +42,17 @@ public class ModelSelectionSampleTest {
         assertEquals("low", choices.defaultEffort);
         assertTrue(new ModelSelectionSample.Choices(model(true, "null")).windows.isEmpty());
     }
-    @Test public void excludesDisabledModelsAndFailsEmptyCatalog() {
+
+    @Test
+    public void excludesDisabledModelsAndFailsEmptyCatalog() {
         ModelInfo enabled = model(true, "{}");
         assertEquals(Collections.singletonList(enabled), ModelSelectionSample.enabled(Arrays.asList(model(false, "{}"), enabled)));
         assertThrows(IllegalStateException.class, () -> ModelSelectionSample.enabled(Collections.<ModelInfo>emptyList()));
         assertThrows(IllegalStateException.class, () -> ModelSelectionSample.enabled(Collections.singletonList(model(false, "{}"))));
     }
-    @Test public void acceptsIndexValueOrDefaultAndRejectsInvalidSelection() {
+
+    @Test
+    public void acceptsIndexValueOrDefaultAndRejectsInvalidSelection() {
         List<String> values = Arrays.asList("auto", "model");
         assertEquals(0, ModelSelectionSample.selection("", values, 0));
         assertEquals(1, ModelSelectionSample.selection("2", values, 0));
@@ -42,7 +60,9 @@ public class ModelSelectionSampleTest {
         assertThrows(IllegalArgumentException.class, () -> ModelSelectionSample.selection("0", values, 0));
         assertThrows(IllegalArgumentException.class, () -> ModelSelectionSample.selection("missing", values, 0));
     }
-    @Test public void policyCarriesStructuredParametersAndRejectsStaleOrInvalidChoices() {
+
+    @Test
+    public void policyCarriesStructuredParametersAndRejectsStaleOrInvalidChoices() {
         ModelInfo selected = model(true, "{\"availableContextWindows\":[8000],\"efforts\":[\"low\"]}");
         ModelPolicyResult result = ModelSelectionSample.policy(selected, 8000L, "low", Collections.singletonList(selected));
         assertEquals(selected.modelId(), result.model().get());

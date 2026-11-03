@@ -1,17 +1,31 @@
 package com.qoder.samples.review;
+
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
-import java.io.*;
+
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.*;
-import java.util.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
-import static org.junit.Assert.*;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertTrue;
 
 public class CodeReviewTest {
     @Rule public TemporaryFolder temp = new TemporaryFolder();
-    @Test public void enforcesByteLimitIncludingMultibyteText() throws Exception {
+
+    @Test
+    public void enforcesByteLimitIncludingMultibyteText() throws Exception {
         assertEquals(CodeReview.MAX_DIFF_BYTES, CodeReview.readBounded(
                 new ByteArrayInputStream(new byte[CodeReview.MAX_DIFF_BYTES])).length);
         assertThrows(IOException.class, () -> CodeReview.readBounded(
@@ -19,14 +33,18 @@ public class CodeReviewTest {
         byte[] unicode = String.join("", Collections.nCopies(40_000, "书")).getBytes(StandardCharsets.UTF_8);
         assertThrows(IOException.class, () -> CodeReview.readBounded(new ByteArrayInputStream(unicode)));
     }
-    @Test public void rejectsOptionsAndShellSyntaxInRevisions() {
+
+    @Test
+    public void rejectsOptionsAndShellSyntaxInRevisions() {
         for (String ref : new String[]{"--output=x", "-R", "HEAD;echo hi", "HEAD\n", "$(echo hi)", ""}) {
             assertThrows(IllegalArgumentException.class, () -> CodeReview.revision(ref));
         }
         assertEquals("origin/main", CodeReview.revision("origin/main"));
         assertEquals("HEAD~1", CodeReview.revision("HEAD~1"));
     }
-    @Test public void readsTrackedWorkingTreeDiffAndBranchDiff() throws Exception {
+
+    @Test
+    public void readsTrackedWorkingTreeDiffAndBranchDiff() throws Exception {
         Path repo = repository();
         write(repo, "item.txt", "old\n");
         git(repo, "add", "item.txt");
@@ -42,7 +60,9 @@ public class CodeReviewTest {
         assertTrue(branch.contains("+new"));
         assertThrows(IllegalArgumentException.class, () -> CodeReview.readDiff(repo, null, "HEAD"));
     }
-    @Test public void keepsGitWarningsOutOfTheDiff() throws Exception {
+
+    @Test
+    public void keepsGitWarningsOutOfTheDiff() throws Exception {
         Path repo = repository();
         write(repo, "item.txt", "old\n");
         git(repo, "add", "item.txt");
@@ -56,20 +76,25 @@ public class CodeReviewTest {
         assertFalse(diff, diff.contains("warning:"));
         assertFalse(diff, diff.contains("ambiguous"));
     }
-    @Test public void rejectsFailedGitInsteadOfSendingItsErrorAsDiff() throws Exception {
+
+    @Test
+    public void rejectsFailedGitInsteadOfSendingItsErrorAsDiff() throws Exception {
         Path repo = repository();
         assertThrows(IOException.class, () -> CodeReview.readDiff(repo, null, "missing-ref"));
         Path nonRepo = temp.newFolder("not-a-repo").toPath();
         assertThrows(IOException.class, () -> CodeReview.readDiff(nonRepo, null, "HEAD"));
     }
+
     private Path repository() throws Exception {
         Path repo = temp.newFolder().toPath();
         git(repo, "init", "-q");
         return repo;
     }
+
     private static void write(Path repo, String file, String text) throws IOException {
         Files.write(repo.resolve(file), text.getBytes(StandardCharsets.UTF_8));
     }
+
     private void git(Path repo, String... args) throws Exception {
         List<String> command = new ArrayList<String>(Arrays.asList("git", "-c", "user.name=Sample",
                 "-c", "user.email=sample@example.invalid", "-c", "commit.gpgSign=false",

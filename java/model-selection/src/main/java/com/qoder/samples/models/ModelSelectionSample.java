@@ -4,22 +4,22 @@ import com.qoder.sdk.MessageCursor;
 import com.qoder.sdk.OneShotQueryRequest;
 import com.qoder.sdk.QoderClient;
 import com.qoder.sdk.QoderQuery;
+import com.qoder.sdk.QoderSession;
 import com.qoder.sdk.SessionOptions;
 import com.qoder.sdk.auth.Auth;
+import com.qoder.sdk.json.JsonNumber;
+import com.qoder.sdk.json.JsonObject;
+import com.qoder.sdk.json.JsonString;
+import com.qoder.sdk.json.JsonValue;
 import com.qoder.sdk.message.AssistantMessage;
 import com.qoder.sdk.message.ResultMessage;
 import com.qoder.sdk.message.ResultOutcome;
 import com.qoder.sdk.message.SdkMessage;
 import com.qoder.sdk.model.ModelId;
-import com.qoder.sdk.model.ModelSelection;
-
-import com.qoder.sdk.QoderSession;
-import com.qoder.sdk.json.JsonObject;
-import com.qoder.sdk.json.JsonValue;
-import com.qoder.sdk.json.JsonNumber;
-import com.qoder.sdk.json.JsonString;
 import com.qoder.sdk.model.ModelInfo;
 import com.qoder.sdk.model.ModelPolicyResult;
+import com.qoder.sdk.model.ModelSelection;
+
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
@@ -203,7 +203,6 @@ public final class ModelSelectionSample {
         }
     }
 
-
     static void query(SessionOptions options, String prompt) {
         try (QoderClient client = QoderClient.builder().auth(Auth.accessTokenEnv()).build()) {
             QoderQuery query = client.query(OneShotQueryRequest.builder()
@@ -226,5 +225,4 @@ public final class ModelSelectionSample {
             }
         }
     }
-
 }
