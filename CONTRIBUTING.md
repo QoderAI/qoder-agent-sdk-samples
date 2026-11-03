@@ -25,6 +25,8 @@ this repository.
   environment (see the sample README). Maintainer checks use
   [`uv`](https://docs.astral.sh/uv/); contributors do not need `uv` to run a
   sample.
+- Java: JDK 11 or later (17 recommended) and Maven 3.6.3 or later. Run
+  `mvn clean verify` from `java/`, or build a sample from its own directory.
 
 ## Sample requirements
 
@@ -41,6 +43,12 @@ Every sample must:
 - Include a README with prerequisites, setup, run commands, and safety notes.
 - Avoid shared source modules that hide the SDK calls being demonstrated.
 - Keep generated files and expected model output out of the sample directory.
+
+Java coverage is incremental. Keep Java ports behaviorally equivalent and mark
+missing Java entries with an em dash in both indexes.
+Document differences required by the released Java API and verify them with the
+actual SDK/CLI pair. Adding a Java port of an existing concept does not require
+porting unrelated concepts.
 
 ## Adding a new sample
 
@@ -61,6 +69,29 @@ kebab-case sample name.
 5. **List it in both READMEs:** add a row to the sample table in `README.md` and
    in `README.zh-CN.md`.
 
+For a Java port, create `java/<sample>/` with a standalone `pom.xml`, a README,
+and sources under `src/main/java`. Register it in `java/pom.xml` and both sample
+indexes. The Java CI job builds every registered module. Pin a released Central
+SDK version, compile with `--release 8`, and keep the sample independent of
+the aggregator and any SDK source checkout. Tests must run without credentials
+or a real CLI; document real queries as opt-in checks.
+
+When updating the Java SDK, update every sample's `qoder.sdk.version` and any
+explicit dependency versions, both root README compatibility lists, the Java
+overview coordinate, and affected sample requirements. Validate the published
+artifact using an empty Maven local repository:
+
+```bash
+cd java
+mvn -B -ntp -Dmaven.repo.local=/path/to/empty/maven-cache clean verify
+```
+
+Use Central or a verified Central mirror, and build each changed sample from
+its own directory as well. For real queries, use the SDK's managed CLI; record
+the SDK/CLI versions and platform actually exercised. Keep historical
+verification records accurate. A newer version in registry metadata or a green
+compile is not a real-runtime compatibility result.
+
 Keep the TypeScript and Python versions behaviorally equivalent so readers can
 switch between languages. When one concept has multiple independently copyable
 variants, keep them in one sample directory and list every entry in its README.
@@ -80,6 +111,7 @@ cd ../python && uv sync && uv run ruff check . && uv run ruff format --check .
 for sample in quickstart multi-turn-conversation streaming-chat code-review tool-permissions ask-user-question model-selection hooks custom-tools subagents external-session-storage; do
   uv run mypy "$sample"
 done
+cd ../java && mvn -B -ntp clean verify
 ```
 
 If `ruff format --check` reports changes, run `uv run ruff format .` to apply

@@ -1,7 +1,7 @@
 # Qoder Agent SDK Samples
 
 Runnable, focused examples for building applications with the Qoder Agent SDK.
-Every sample is available in TypeScript and Python.
+Samples are available in TypeScript, Python, and Java, with coverage listed below.
 
 ## Application templates
 
@@ -11,19 +11,19 @@ Every sample is available in TypeScript and Python.
 
 ## Samples
 
-| Sample | What it demonstrates | TypeScript | Python |
-| --- | --- | --- | --- |
-| Quickstart | Run one repository-aware query and handle the result | [Open](typescript/quickstart) | [Open](python/quickstart) |
-| Multi-turn conversation | Control the query lifecycle and resume context after closing | [Open](typescript/multi-turn-conversation) | [Open](python/multi-turn-conversation) |
-| Streaming chat | Stream output while keeping one live session open | [Open](typescript/streaming-chat) | [Open](python/streaming-chat) |
-| Code review | Review a Git diff with read-only repository tools | [Open](typescript/code-review) | [Open](python/code-review) |
-| Tool permissions | Separate tool visibility, pre-approval, and runtime authorization | [Open](typescript/tool-permissions) | [Open](python/tool-permissions) |
-| Ask user question | Render structured questions and return user answers | [Open](typescript/ask-user-question) | [Open](python/ask-user-question) |
-| Model selection | List models and select context-window and reasoning parameters | [Open](typescript/model-selection) | [Open](python/model-selection) |
-| Hooks | Add lifecycle observation, context injection, and tool policy | [Open](typescript/hooks) | [Open](python/hooks) |
-| Custom tools | Expose application functions as in-process MCP tools | [Open](typescript/custom-tools) | [Open](python/custom-tools) |
-| Subagents | Delegate a task to specialized SDK-defined agents | [Open](typescript/subagents) | [Open](python/subagents) |
-| External session storage | Resume a session on another runtime through Redis or PostgreSQL | [Open](typescript/external-session-storage) | [Open](python/external-session-storage) |
+| Sample | What it demonstrates | TypeScript | Python | Java |
+| --- | --- | --- | --- | --- |
+| Quickstart | Run one repository-aware query and handle the result | [Open](typescript/quickstart) | [Open](python/quickstart) | [Open](java/quickstart) |
+| Multi-turn conversation | Control the query lifecycle and resume context after closing | [Open](typescript/multi-turn-conversation) | [Open](python/multi-turn-conversation) | [Open](java/multi-turn-conversation) |
+| Streaming chat | Stream output while keeping one live session open | [Open](typescript/streaming-chat) | [Open](python/streaming-chat) | [Open](java/streaming-chat) |
+| Code review | Review a Git diff with read-only repository tools | [Open](typescript/code-review) | [Open](python/code-review) | [Open](java/code-review) |
+| Tool permissions | Separate tool visibility, pre-approval, and runtime authorization | [Open](typescript/tool-permissions) | [Open](python/tool-permissions) | [Open](java/tool-permissions) |
+| Ask user question | Render structured questions and return user answers | [Open](typescript/ask-user-question) | [Open](python/ask-user-question) | — |
+| Model selection | List models and select context-window and reasoning parameters | [Open](typescript/model-selection) | [Open](python/model-selection) | [Open](java/model-selection) |
+| Hooks | Add lifecycle observation, context injection, and tool policy | [Open](typescript/hooks) | [Open](python/hooks) | [Open](java/hooks) |
+| Custom tools | Expose application functions as in-process MCP tools | [Open](typescript/custom-tools) | [Open](python/custom-tools) | — |
+| Subagents | Delegate a task to specialized SDK-defined agents | [Open](typescript/subagents) | [Open](python/subagents) | — |
+| External session storage | Resume a session on another runtime through Redis or PostgreSQL | [Open](typescript/external-session-storage) | [Open](python/external-session-storage) | — |
 
 ## Setup
 
@@ -43,6 +43,7 @@ For the complete API guide, see the
 
 - TypeScript samples: Node.js 18 or later
 - Python samples: Python 3.10 or later
+- Java samples: JDK 11 or later (17 recommended), Maven 3.6.3 or later; see [Java setup](java)
 - Qoder authentication configured as described above
 
 Each sample is self-contained. Open its README for installation and run
@@ -50,13 +51,15 @@ commands.
 
 ## Compatibility
 
-The sample manifests declare compatible SDK version ranges, while the
-repository lockfiles record the exact versions used by CI.
+TypeScript and Python manifests declare compatible SDK version ranges; their
+lockfiles record the exact versions used by CI. Java POMs pin SDK 0.2.3 from
+Maven Central and compile with `--release 8`.
 
-Last verified on July 29, 2026:
+Dependency versions (build and runtime checks are reported separately):
 
 - TypeScript SDK 1.0.16
 - Python SDK 1.0.10
+- Java SDK 0.2.3
 
 ## License and terms
 
