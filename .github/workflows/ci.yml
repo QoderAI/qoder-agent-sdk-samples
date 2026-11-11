@@ -14,6 +14,33 @@ jobs:
     strategy:
       matrix:
         java: [11, 17]
+    # The external session storage contract tests run against these services.
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: qoder
+          POSTGRES_PASSWORD: qoder
+          POSTGRES_DB: qoder_session_store
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U qoder -d qoder_session_store"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      QODER_SAMPLE_TEST_REDIS_URL: redis://127.0.0.1:6379
+      QODER_SAMPLE_TEST_POSTGRES_URL: postgresql://qoder:qoder@127.0.0.1:5432/qoder_session_store
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4

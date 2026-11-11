@@ -18,12 +18,12 @@
 | Streaming chat | 在一个持续连接的会话中进行流式输出 | [查看](typescript/streaming-chat) | [查看](python/streaming-chat) | [查看](java/streaming-chat) |
 | Code review | 使用只读仓库工具审查 Git diff | [查看](typescript/code-review) | [查看](python/code-review) | [查看](java/code-review) |
 | Tool permissions | 区分工具可见性、预授权和运行时授权 | [查看](typescript/tool-permissions) | [查看](python/tool-permissions) | [查看](java/tool-permissions) |
-| Ask user question | 渲染结构化问题并将用户回答返回给 Agent | [查看](typescript/ask-user-question) | [查看](python/ask-user-question) | — |
+| Ask user question | 渲染结构化问题并将用户回答返回给 Agent | [查看](typescript/ask-user-question) | [查看](python/ask-user-question) | [查看](java/ask-user-question) |
 | Model selection | 列出模型并选择上下文窗口和推理参数 | [查看](typescript/model-selection) | [查看](python/model-selection) | [查看](java/model-selection) |
 | Hooks | 添加生命周期观测、上下文注入和工具策略 | [查看](typescript/hooks) | [查看](python/hooks) | [查看](java/hooks) |
-| Custom tools | 将应用函数注册为进程内 MCP 工具 | [查看](typescript/custom-tools) | [查看](python/custom-tools) | — |
-| Subagents | 将任务委派给 SDK 定义的专业子 Agent | [查看](typescript/subagents) | [查看](python/subagents) | — |
-| External session storage | 通过 Redis 或 PostgreSQL 在另一个运行实例上恢复会话 | [查看](typescript/external-session-storage) | [查看](python/external-session-storage) | — |
+| Custom tools | 将应用函数注册为进程内 MCP 工具 | [查看](typescript/custom-tools) | [查看](python/custom-tools) | [查看](java/custom-tools) |
+| Subagents | 将任务委派给 SDK 定义的专业子 Agent | [查看](typescript/subagents) | [查看](python/subagents) | [查看](java/subagents) |
+| External session storage | 通过 Redis 或 PostgreSQL 在另一个运行实例上恢复会话 | [查看](typescript/external-session-storage) | [查看](python/external-session-storage) | [查看](java/external-session-storage) |
 
 ## 准备工作
 
@@ -44,13 +44,13 @@ Java 构建需要 JDK 11 或更高版本（推荐 17）和 Maven 3.6.3 或更高
 ## 兼容性
 
 TypeScript/Python 依赖清单声明兼容的版本范围，锁文件记录 CI 使用的确切版本。
-Java POM 固定使用 Maven Central 的 SDK 0.2.3，并以 `--release 8` 编译。
+Java POM 固定使用 Maven Central 的 SDK 0.2.4，并以 `--release 8` 编译。
 
 依赖版本（构建与真实运行验证分别记录）：
 
 - TypeScript SDK 1.0.16
 - Python SDK 1.0.10
-- Java SDK 0.2.3
+- Java SDK 0.2.4
 
 ## 许可与条款
 

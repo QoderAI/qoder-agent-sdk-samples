@@ -1,7 +1,7 @@
 # Quickstart
 
 Run one repository-aware query and print the assistant response. This sample
-uses only the public API of Java SDK 0.2.3, resolved from Maven Central.
+uses only the public API of Java SDK 0.2.4, resolved from Maven Central.
 
 ## Run
 
@@ -22,7 +22,7 @@ mvn compile exec:java -Dexec.args='"/path/to/repository" "Describe the test stra
 With no arguments the sample inspects the current directory. The first run
 downloads the SDK's pinned CLI 1.1.80 and requires access to the Qoder download
 service. Leave `QODERCLI_PATH` unset; CLI 1.1.81 and later cannot run the independent
-SDK process required by SDK 0.2.3. See [Java runtime notes](../README.md#runtime).
+SDK process required by SDK 0.2.4. See [Java runtime notes](../README.md#runtime).
 
 ## Behavior and permissions
 

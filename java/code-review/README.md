@@ -7,7 +7,7 @@ it with read-only repository tools.
 
 Use JDK 11 or later (17 recommended), Maven 3.6.3 or later, and
 `QODER_PERSONAL_ACCESS_TOKEN` from your environment. The standalone POM resolves
-`com.qoder.sdk:qoder-agent-sdk:0.2.3` from Maven Central and compiles for Java 8.
+`com.qoder.sdk:qoder-agent-sdk:0.2.4` from Maven Central and compiles for Java 8.
 Leave `QODERCLI_PATH` unset to use the SDK's verified, managed CLI 1.1.80.
 See [Java runtime notes](../README.md#runtime); CLI 1.1.81+ is incompatible
 with this SDK's separate-process mode.

@@ -18,12 +18,12 @@ Samples are available in TypeScript, Python, and Java, with coverage listed belo
 | Streaming chat | Stream output while keeping one live session open | [Open](typescript/streaming-chat) | [Open](python/streaming-chat) | [Open](java/streaming-chat) |
 | Code review | Review a Git diff with read-only repository tools | [Open](typescript/code-review) | [Open](python/code-review) | [Open](java/code-review) |
 | Tool permissions | Separate tool visibility, pre-approval, and runtime authorization | [Open](typescript/tool-permissions) | [Open](python/tool-permissions) | [Open](java/tool-permissions) |
-| Ask user question | Render structured questions and return user answers | [Open](typescript/ask-user-question) | [Open](python/ask-user-question) | — |
+| Ask user question | Render structured questions and return user answers | [Open](typescript/ask-user-question) | [Open](python/ask-user-question) | [Open](java/ask-user-question) |
 | Model selection | List models and select context-window and reasoning parameters | [Open](typescript/model-selection) | [Open](python/model-selection) | [Open](java/model-selection) |
 | Hooks | Add lifecycle observation, context injection, and tool policy | [Open](typescript/hooks) | [Open](python/hooks) | [Open](java/hooks) |
-| Custom tools | Expose application functions as in-process MCP tools | [Open](typescript/custom-tools) | [Open](python/custom-tools) | — |
-| Subagents | Delegate a task to specialized SDK-defined agents | [Open](typescript/subagents) | [Open](python/subagents) | — |
-| External session storage | Resume a session on another runtime through Redis or PostgreSQL | [Open](typescript/external-session-storage) | [Open](python/external-session-storage) | — |
+| Custom tools | Expose application functions as in-process MCP tools | [Open](typescript/custom-tools) | [Open](python/custom-tools) | [Open](java/custom-tools) |
+| Subagents | Delegate a task to specialized SDK-defined agents | [Open](typescript/subagents) | [Open](python/subagents) | [Open](java/subagents) |
+| External session storage | Resume a session on another runtime through Redis or PostgreSQL | [Open](typescript/external-session-storage) | [Open](python/external-session-storage) | [Open](java/external-session-storage) |
 
 ## Setup
 
@@ -52,14 +52,14 @@ commands.
 ## Compatibility
 
 TypeScript and Python manifests declare compatible SDK version ranges; their
-lockfiles record the exact versions used by CI. Java POMs pin SDK 0.2.3 from
+lockfiles record the exact versions used by CI. Java POMs pin SDK 0.2.4 from
 Maven Central and compile with `--release 8`.
 
 Dependency versions (build and runtime checks are reported separately):
 
 - TypeScript SDK 1.0.16
 - Python SDK 1.0.10
-- Java SDK 0.2.3
+- Java SDK 0.2.4
 
 ## License and terms
 

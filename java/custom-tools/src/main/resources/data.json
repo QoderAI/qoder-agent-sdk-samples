@@ -1,0 +1,18 @@
+{
+  "services": {
+    "payments-api": {
+      "build": {
+        "status": "passed",
+        "revision": "8f2a1c4",
+        "completedAt": "2026-07-20T04:15:00Z"
+      },
+      "incidents": [
+        {
+          "id": "INC-1042",
+          "severity": "low",
+          "summary": "Elevated latency in the sandbox environment"
+        }
+      ]
+    }
+  }
+}

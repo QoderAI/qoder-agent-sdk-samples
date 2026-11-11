@@ -9,7 +9,7 @@
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <maven.compiler.release>8</maven.compiler.release>
-    <qoder.sdk.version>0.2.3</qoder.sdk.version>
+    <qoder.sdk.version>0.2.4</qoder.sdk.version>
   </properties>
   <dependencies>
     <dependency>

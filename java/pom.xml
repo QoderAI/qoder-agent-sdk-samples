@@ -10,10 +10,14 @@
   <modules>
     <module>quickstart</module>
     <module>tool-permissions</module>
+    <module>ask-user-question</module>
     <module>hooks</module>
     <module>code-review</module>
     <module>multi-turn-conversation</module>
     <module>streaming-chat</module>
     <module>model-selection</module>
+    <module>custom-tools</module>
+    <module>subagents</module>
+    <module>external-session-storage</module>
   </modules>
 </project>

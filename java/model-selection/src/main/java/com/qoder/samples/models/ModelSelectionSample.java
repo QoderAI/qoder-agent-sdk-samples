@@ -31,6 +31,10 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 public final class ModelSelectionSample {
+    // SDK 0.2.4 omits `--tools` for an empty list, which keeps the CLI default tools. A single empty
+    // name produces `--tools ""`, the same argument the TypeScript and Python SDKs send for `tools: []`.
+    static final List<String> NO_TOOLS = Collections.singletonList("");
+
     static JsonObject object(JsonValue value) {
         return value != null && value.isObject() ? value.asObject() : JsonObject.empty();
     }
@@ -132,21 +136,24 @@ public final class ModelSelectionSample {
         }
     }
 
+    // A nonempty catalog is the current one: validate against its entry for the selected ID, not the
+    // metadata captured at selection time, so withdrawn windows or efforts fail instead of being sent.
     static ModelPolicyResult policy(ModelInfo selected, Long window, String effort, List<ModelInfo> available) {
+        ModelInfo current = selected;
         if (!available.isEmpty()) {
-            boolean found = false;
+            current = null;
             for (ModelInfo model : available) {
-                if (model.isEnabled() && model.modelId().equals(selected.modelId())) found = true;
+                if (model.isEnabled() && model.modelId().equals(selected.modelId())) current = model;
             }
-            if (!found) throw new IllegalStateException("Selected model is no longer available.");
+            if (current == null) throw new IllegalStateException("Selected model is no longer available.");
         }
-        Choices choices = new Choices(selected);
+        Choices choices = new Choices(current);
         if (window != null && !choices.windows.contains(window)) throw new IllegalArgumentException("Unknown context window.");
         if (effort != null && !choices.efforts.contains(effort)) throw new IllegalArgumentException("Unknown reasoning effort.");
         JsonObject.Builder parameters = JsonObject.builder();
         if (window != null) parameters.put("contextWindow", JsonNumber.of(window));
         if (effort != null) parameters.put("reasoningEffort", JsonString.of(effort));
-        ModelPolicyResult.Builder result = ModelPolicyResult.builder().model(selected.modelId());
+        ModelPolicyResult.Builder result = ModelPolicyResult.builder().model(current.modelId());
         if (window != null || effort != null) result.parameters(parameters.build());
         return result.build();
     }
@@ -163,7 +170,7 @@ public final class ModelSelectionSample {
             // Close the discovery session before waiting for user input.
             try (QoderClient client = QoderClient.builder().auth(Auth.accessTokenEnv()).build();
                  QoderSession session = client.openSession(SessionOptions.builder()
-                         .tools(Collections.<String>emptyList()).build()).toCompletableFuture().get()) {
+                         .tools(NO_TOOLS).build()).toCompletableFuture().get()) {
                 models = enabled(session.getAvailableModels().toCompletableFuture().get());
             }
             BufferedReader input = new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8));
@@ -189,7 +196,7 @@ public final class ModelSelectionSample {
             System.out.println("Selected: " + selected.modelId().value() + "; context="
                     + (window == null ? "model default" : window) + "; reasoning=" + (effort == null ? "model default" : effort));
             ModelPolicyResult cached = policy(selected, window, effort, Collections.<ModelInfo>emptyList());
-            SessionOptions options = SessionOptions.builder().tools(Collections.<String>emptyList()).maxTurns(1)
+            SessionOptions options = SessionOptions.builder().tools(NO_TOOLS).maxTurns(1)
                     .modelSelection(ModelSelection.policy(selected.modelId(), context -> {
                         policy(selected, window, effort, context.availableModels());
                         System.out.println("[model-policy] using cached selection");

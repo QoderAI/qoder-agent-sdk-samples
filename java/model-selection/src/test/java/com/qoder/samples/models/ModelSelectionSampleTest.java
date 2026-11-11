@@ -1,5 +1,7 @@
 package com.qoder.samples.models;
 
+import com.qoder.sdk.SessionOptions;
+import com.qoder.sdk.internal.session.CliArguments;
 import com.qoder.sdk.json.JsonValue;
 import com.qoder.sdk.model.ModelId;
 import com.qoder.sdk.model.ModelInfo;
@@ -73,5 +75,34 @@ public class ModelSelectionSampleTest {
                 Collections.<ModelInfo>emptyList()));
         assertFalse(ModelSelectionSample.policy(model(true, "{}"), null, null,
                 Collections.<ModelInfo>emptyList()).parameters().isPresent());
+    }
+
+    @Test
+    public void policyValidatesChoicesAgainstCurrentCatalogEntry() {
+        ModelInfo selected = model(true, "{\"availableContextWindows\":[8000,16000],\"efforts\":[\"low\",\"high\"]}");
+        List<ModelInfo> current = Collections.singletonList(model(true,
+                "{\"availableContextWindows\":[8000],\"efforts\":[\"low\"]}"));
+        assertThrows(IllegalArgumentException.class, () -> ModelSelectionSample.policy(selected, 16000L, null, current));
+        assertThrows(IllegalArgumentException.class, () -> ModelSelectionSample.policy(selected, null, "high", current));
+        ModelPolicyResult result = ModelSelectionSample.policy(selected, 8000L, "low", current);
+        assertEquals(JsonValue.parse("{\"contextWindow\":8000,\"reasoningEffort\":\"low\"}"), result.parameters().get());
+        List<ModelInfo> renamed = Collections.singletonList(ModelInfo.of(ModelId.of("other-model"), "Other", null, true,
+                JsonValue.parse("{\"availableContextWindows\":[16000]}")));
+        assertThrows(IllegalStateException.class, () -> ModelSelectionSample.policy(selected, 16000L, null, renamed));
+    }
+
+    // Pins the SDK 0.2.4 argument translation that NO_TOOLS depends on. CliArguments is an internal
+    // SDK class used only here, so a later SDK that changes the empty-list semantics fails this test.
+    @Test
+    public void noToolsOptionProducesEmptyToolsArgument() {
+        List<String> omitted = CliArguments.forOptions(SessionOptions.builder()
+                .tools(Collections.<String>emptyList()).build(), null);
+        assertFalse(omitted.contains("--tools"));
+        List<String> disabled = CliArguments.forOptions(SessionOptions.builder()
+                .tools(ModelSelectionSample.NO_TOOLS).maxTurns(1).build(), null);
+        int index = disabled.indexOf("--tools");
+        assertTrue(index >= 0);
+        assertEquals("", disabled.get(index + 1));
+        assertFalse(disabled.contains("--allowed-tools"));
     }
 }

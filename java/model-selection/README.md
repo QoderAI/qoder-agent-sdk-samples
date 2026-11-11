@@ -7,7 +7,7 @@ parameters, then apply the choice through a model policy callback.
 
 Use JDK 11 or later (17 recommended), Maven 3.6.3 or later, and
 `QODER_PERSONAL_ACCESS_TOKEN` from your environment. The standalone POM resolves
-`com.qoder.sdk:qoder-agent-sdk:0.2.3` from Maven Central and compiles for Java 8.
+`com.qoder.sdk:qoder-agent-sdk:0.2.4` from Maven Central and compiles for Java 8.
 Leave `QODERCLI_PATH` unset to use the SDK's verified, managed CLI 1.1.80.
 See [Java runtime notes](../README.md#runtime); CLI 1.1.81+ is incompatible
 with this SDK's separate-process mode.
@@ -49,16 +49,23 @@ Optional metadata comes from `ModelInfo.raw()`: context windows combine
 Defaults must be present among advertised choices; otherwise the first valid
 choice is used. Absent choices leave that parameter to the model default.
 
-A second query installs `ModelSelection.policy(...)`. The callback validates
-that the selected model remains enabled when a nonempty catalog is supplied,
-then returns the cached `ModelPolicyResult` immediately. It never waits for
-terminal input. Context and reasoning values are structured `parameters`,
-not text appended to the prompt. The callback log confirms actual invocation.
+A second query installs `ModelSelection.policy(...)`. When a nonempty catalog
+is supplied, the callback validates that the selected model remains enabled and
+checks the chosen context window and reasoning effort against that catalog's
+entry for the same model ID, not against the metadata captured at selection
+time. It then returns the cached `ModelPolicyResult` immediately and never
+waits for terminal input. Context and reasoning values are structured
+`parameters`, not text appended to the prompt. The callback log confirms actual
+invocation.
 
-The execution query exposes no tools and permits one turn. Empty catalogs,
-unavailable selections, unsupported SDK/CLI capabilities, and unsuccessful
-results fail explicitly; the sample does not guess unsupported capabilities.
-Discovery and query resources close on success and failure.
+The execution query exposes no tools and permits one turn. SDK 0.2.4 omits the
+`--tools` CLI argument for an empty `tools` list, which keeps the CLI default
+tools, so the sample passes a single empty tool name (`NO_TOOLS`). That sends
+`--tools ""`, the same argument the TypeScript and Python SDKs send for
+`tools: []`. Empty catalogs, unavailable selections, unsupported SDK/CLI
+capabilities, and unsuccessful results fail explicitly; the sample does not
+guess unsupported capabilities. Discovery and query resources close on success
+and failure.
 
 ## Verify
 
@@ -66,9 +73,14 @@ Discovery and query resources close on success and failure.
 mvn -B -ntp clean verify
 ```
 
-Tests use JUnit 4 and the published SDK's public API. They require no token or
-CLI. This directory builds independently when copied out of the repository.
+Tests use JUnit 4 and the published SDK's public API, with one exception: a
+single test calls the internal `CliArguments` class to pin the SDK 0.2.4
+translation of `NO_TOOLS` into `--tools ""`. If a later SDK changes the
+empty-list semantics, that test fails and `NO_TOOLS` should be revisited. Tests
+require no token or CLI. This directory builds independently when copied out of
+the repository.
 
 Tests cover both metadata formats, malformed fields, disabled models, input
-selection, stale catalogs, and structured policy parameters. Real model choices
+selection, stale catalogs, parameters withdrawn from the current catalog,
+structured policy parameters, and the no-tools CLI argument. Real model choices
 depend on your account and runtime; they are not stored as test fixtures.
